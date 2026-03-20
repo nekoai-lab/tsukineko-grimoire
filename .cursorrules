@@ -1,0 +1,193 @@
+# Tsukineko Grimoire - Cursor Development Rules
+
+このプロジェクトは Google Cloud "Trial credit for GenAI App Builder" クーポンを消費することが
+最優先目的です。以下のルールを **絶対に** 遵守してください。
+
+---
+
+## 🚨 CRITICAL: クーポン制約（最重要）
+
+### ✅ 許可されるライブラリ・API（これらのみ使用可能）
+
+```typescript
+// ✅ ALLOWED: Agent Builder のみ
+import { ConversationalSearchServiceClient } from '@google-cloud/discoveryengine';
+import { SearchServiceClient } from '@google-cloud/discoveryengine';
+import { DocumentServiceClient } from '@google-cloud/discoveryengine';
+```
+
+### ❌ 禁止されるライブラリ・API（絶対に使用禁止）
+
+```typescript
+// ❌ FORBIDDEN: 高額請求の原因になる
+import { VertexAI } from '@google-cloud/vertexai';
+import { GenerativeModel } from '@google-cloud/vertexai';
+import * as aiplatform from '@google-cloud/aiplatform';
+
+// これらのメソッドも禁止
+model.generateContent()
+model.streamGenerateContent()
+model.countTokens()
+```
+
+### 🔍 コード生成前の自己チェック
+
+コードを生成・提案する前に確認:
+1. `@google-cloud/vertexai` を使っていないか？
+2. `GenerativeModel` クラスを使用していないか？
+3. すべての AI 機能が `@google-cloud/discoveryengine` 経由か？
+
+違反を発見した場合は即座に修正してください。
+
+---
+
+## 📍 Vertex AI Agent Builder: Location 設定（必須）
+
+```
+Location:         global  ← 必ず global を使用
+API Endpoint:     discoveryengine.googleapis.com  ← regional prefix なし
+Engine ID:        短いIDのみ (例: my-engine_1234567890)
+Data Store ID:    短いIDのみ (例: my-datastore_1234567890)
+```
+
+```typescript
+// ✅ CORRECT
+const location = process.env.VERTEX_AI_LOCATION!; // 'global'
+const apiEndpoint = location === 'global'
+  ? 'discoveryengine.googleapis.com'
+  : `${location}-discoveryengine.googleapis.com`;
+
+const client = new ConversationalSearchServiceClient({ apiEndpoint });
+
+const servingConfig = client.projectLocationCollectionEngineServingConfigPath(
+  process.env.GOOGLE_CLOUD_PROJECT_ID!,
+  location,                             // 'global'
+  'default_collection',
+  process.env.VERTEX_AI_ENGINE_ID!,     // 短いIDのみ
+  'default_config'
+);
+
+// ❌ WRONG
+const client = new ConversationalSearchServiceClient({
+  apiEndpoint: 'asia-northeast1-discoveryengine.googleapis.com', // NG
+});
+```
+
+---
+
+## 🔐 認証パターン（必須）
+
+### middleware.ts: Cookie確認のみ（firebase-admin 禁止）
+
+```typescript
+// ✅ CORRECT: Edge Runtime 対応
+// Cookieの存在確認のみ行い、x-session-token を後段に渡す
+if (!session?.value) {
+  return NextResponse.redirect(new URL('/login', request.url));
+}
+const requestHeaders = new Headers(request.headers);
+requestHeaders.set('x-session-token', session.value);
+
+// ❌ WRONG: Edge Runtime でクラッシュする
+const { auth } = await import('./lib/firebase-admin'); // 使用禁止
+await auth.verifySessionCookie(session.value, true);   // 使用禁止
+```
+
+### API Routes: verifyAndGetUser() を必ず使用
+
+```typescript
+// ✅ CORRECT: 全 API Route の先頭でこのパターンを使う
+import { verifyAndGetUser } from '@/lib/auth-helpers';
+
+export async function POST(req: Request) {
+  let userId: string;
+  try {
+    const user = await verifyAndGetUser(req);
+    userId = user.uid;
+  } catch {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // ... rest of logic
+}
+```
+
+### Firebase Admin: FieldValue は必ず import
+
+```typescript
+// ✅ CORRECT
+import { firestore, FieldValue } from '@/lib/firebase-admin';
+
+await firestore.collection('documents').add({
+  uploadedAt: FieldValue.serverTimestamp(), // ✅
+});
+
+// ❌ WRONG: admin が undefined になる
+import { firestore } from '@/lib/firebase-admin';
+uploadedAt: admin.firestore.FieldValue.serverTimestamp(), // ❌
+```
+
+---
+
+## 📐 コーディング規約
+
+### TypeScript
+- strict mode 必須
+- `any` 型の使用禁止（`unknown` を使用）
+- すべての関数に型定義
+- async/await には必ず try-catch
+
+### エラーハンドリング
+- エラーメッセージは魔法テーマで:
+  - UNAUTHENTICATED → "魔導書へのアクセスが拒否されました"
+  - NOT_FOUND → "その知識は魔導書に記録されていません"
+  - INVALID_ARGUMENT → "呪文の詠唱に失敗しました"
+  - RESOURCE_EXHAUSTED → "魔力が不足しています。しばらくお待ちください"
+
+### ファイル命名規則
+- コンポーネント: PascalCase (`ChatInterface.tsx`)
+- ユーティリティ: kebab-case (`vertex-discovery.ts`)
+- API Routes: `route.ts` (Next.js App Router)
+
+### セキュリティ
+- `NEXT_PUBLIC_` のない環境変数は絶対にクライアントに渡さない
+- GCS Signed URL の有効期限は15分以内
+- セッション検証は必ず API Route 側で行う
+
+---
+
+## 🎨 UI/UX
+
+### テーマ: Magic × Cyberpunk
+- Background: `#0a0a0a` (void black)
+- Primary: `#7c3aed` (mystic purple)
+- Accent: `#fbbf24` (gold)
+- Glow: `#a78bfa` (mana glow)
+
+### コンポーネントパターン
+```tsx
+// Glassmorphism
+<div className="bg-black/60 backdrop-blur-xl border border-purple-500/20 rounded-lg">
+
+// Levitation
+<motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity }}>
+
+// Glow Button
+<button className="hover:shadow-[0_0_20px_rgba(167,139,250,0.6)] transition-shadow duration-300">
+```
+
+### レスポンシブ
+- Mobile: チャット100%幅, Previewは非表示
+- Tablet+: `md:w-[60%]` / `md:w-[40%]`
+
+---
+
+## 🚀 デプロイ
+- Next.js: `output: 'standalone'` 必須
+- Cloud Run: ポート 8080、`Dockerfile` を使用
+- pnpm: `--frozen-lockfile` で依存関係をロック
+
+---
+
+## 📖 常に参照すること
+- `PRD.md` に全ての仕様が記載されています
+- 実装前に必ず PRD.md の該当セクションを確認してください

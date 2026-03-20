@@ -1,0 +1,68 @@
+arxiv_id,title,category
+1706.03762,Attention Is All You Need,基礎LLMアーキテクチャ
+1810.04805,BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding,基礎LLMアーキテクチャ
+1909.08593,Fine-Tuning Language Models from Human Preferences,AIセーフティ・アライメント
+2004.04906,Dense Passage Retrieval for Open-Domain Question Answering,検索・知識グラフ
+2004.12832,ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT,検索・知識グラフ
+2005.11401,Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,RAG
+2005.14165,Language Models are Few-Shot Learners,基礎LLMアーキテクチャ
+2009.03300,Measuring Massive Multitask Language Understanding,評価・ベンチマーク
+2103.00020,Learning Transferable Visual Models From Natural Language Supervision,マルチモーダル
+2106.09685,LoRA: Low-Rank Adaptation of Large Language Models,ファインチューニング・効率化
+2107.03374,Evaluating Large Language Models Trained on Code,評価・ベンチマーク
+2109.07958,TruthfulQA: Measuring How Models Mimic Human Falsehoods,評価・ベンチマーク
+2201.11903,Chain-of-Thought Prompting Elicits Reasoning in Large Language Models,プロンプトエンジニアリング
+2203.02155,Training language models to follow instructions with human feedback,ファインチューニング・効率化
+2203.11171,Self-Consistency Improves Chain of Thought Reasoning in Language Models,プロンプトエンジニアリング
+2204.14198,Flamingo: a Visual Language Model for Few-Shot Learning,マルチモーダル
+2205.11916,Large Language Models are Zero-Shot Reasoners,プロンプトエンジニアリング
+2210.03629,ReAct: Synergizing Reasoning and Acting in Language Models,LLMエージェント・ツール利用
+2212.08073,Constitutional AI: Harmlessness from AI Feedback,AIセーフティ・アライメント
+2212.10496,Precise Zero-Shot Dense Retrieval without Relevance Labels,RAG
+2301.12597,BLIP-2: Bootstrapping Language-Image Pre-training with Frozen Image Encoders and Large Language Models,マルチモーダル
+2302.01560,Describe Explain Plan and Select: Interactive Planning with Large Language Models Enables Open-World Multi-Task Agents,LLMエージェント・ツール利用
+2302.04761,Toolformer: Language Models Can Teach Themselves to Use Tools,LLMエージェント・ツール利用
+2302.13971,LLaMA: Open and Efficient Foundation Language Models,基礎LLMアーキテクチャ
+2303.11366,Reflexion: Language Agents with Verbal Reinforcement Learning,LLMエージェント・ツール利用
+2304.04370,OpenAGI: When LLM Meets Domain Experts,LLMエージェント・ツール利用
+2304.08485,Visual Instruction Tuning,マルチモーダル
+2305.10601,Tree of Thoughts: Deliberate Problem Solving with Large Language Models,プロンプトエンジニアリング
+2305.14314,QLoRA: Efficient Finetuning of Quantized LLMs,ファインチューニング・効率化
+2305.15334,Gorilla: Large Language Model Connected with Massive APIs,LLMエージェント・ツール利用
+2305.16291,Voyager: An Open-Ended Embodied Agent with Large Language Models,LLMエージェント・ツール利用
+2305.18290,Direct Preference Optimization: Your Language Model is Secretly a Reward Model,ファインチューニング・効率化
+2307.07924,ChatDev: Communicative Agents for Software Development,LLMエージェント・ツール利用
+2307.09288,Llama 2: Open Foundation and Fine-Tuned Chat Models,基礎LLMアーキテクチャ
+2308.03688,AgentBench: Evaluating LLMs as Agents,評価・ベンチマーク
+2310.03744,Improved Baselines with Visual Instruction Tuning,マルチモーダル
+2310.11511,Self-RAG: Learning to Retrieve Generate and Critique through Self-Reflection,RAG
+2311.08401,Fine-tuning Language Models for Factuality,ファインチューニング・効率化
+2311.12983,GAIA: a benchmark for General AI Assistants,評価・ベンチマーク
+2312.06648,Dense X Retrieval: What Retrieval Granularity Should We Use?,検索・知識グラフ
+2312.11805,Gemini: A Family of Highly Capable Multimodal Models,マルチモーダル
+2401.04088,Mixtral of Experts,基礎LLMアーキテクチャ
+2401.10020,Self-Rewarding Language Models,AIセーフティ・アライメント
+2401.13178,AgentBoard: An Analytical Evaluation Board of Multi-turn LLM Agents,評価・ベンチマーク
+2401.15884,Corrective Retrieval Augmented Generation,RAG
+2401.18059,RAPTOR: Recursive Abstractive Processing for Tree-Organized Retrieval,RAG
+2403.10131,RAFT: Adapting Language Model to Domain Specific RAG,RAG
+2404.07972,OSWorld: Benchmarking Multimodal Agents for Open-Ended Tasks in Real Computer Environments,評価・ベンチマーク
+2404.16130,From Local to Global: A Graph RAG Approach to Query-Focused Summarization,RAG
+2404.18416,Capabilities of Gemini Models in Medicine,マルチモーダル
+2405.04434,DeepSeek-V2: A Strong Economical and Efficient Mixture-of-Experts Language Model,基礎LLMアーキテクチャ
+2405.15793,SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering,LLMエージェント・ツール利用
+2406.01574,MMLU-Pro: A More Robust and Challenging Multi-Task Language Understanding Benchmark,評価・ベンチマーク
+2407.21783,The Llama 3 Herd of Models,基礎LLMアーキテクチャ
+2410.12735,CREAM: Consistency Regularized Self-Rewarding Language Models,AIセーフティ・アライメント
+2412.08905,Phi-4 Technical Report,基礎LLMアーキテクチャ
+2412.19437,DeepSeek-V3 Technical Report,基礎LLMアーキテクチャ
+2501.00656,OLMo 2 Furious,基礎LLMアーキテクチャ
+2501.12599,Kimi k1.5: Scaling Reinforcement Learning with LLMs,最新注目論文
+2501.12948,DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning,最新注目論文
+2503.01743,Phi-4-Mini Technical Report,マルチモーダル
+2503.19786,Gemma 3 Technical Report,基礎LLMアーキテクチャ
+2504.21318,Phi-4-reasoning Technical Report,最新注目論文
+2504.21801,DeepSeek-Prover-V2,最新注目論文
+2505.09388,Qwen3 Technical Report,基礎LLMアーキテクチャ
+2506.03569,MiMo-VL Technical Report,マルチモーダル
+2508.15214,Self-Guided Function Calling in Large Language Models via Stepwise Experience Recall,LLMエージェント・ツール利用

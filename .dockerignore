@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env*.local
+README.md
+.cursorrules
+*.log
+.vercel
+Dockerfile
+.dockerignore
+__tests__
+e2e
+*.test.ts
+*.spec.ts
