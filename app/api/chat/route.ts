@@ -42,18 +42,168 @@ export async function POST(req: Request) {
     console.log(`query translated: "${question.slice(0, 40)}" → "${englishQuestion.slice(0, 60)}"`);
   }
 
-  // 4. 会話履歴をクエリに注入（直近3往復 = 6件まで）
-  const recentHistory = (history ?? []).slice(-6);
-  const contextPrefix = recentHistory.length > 0
-    ? recentHistory.map(m =>
-        m.role === 'user' ? `User: ${m.content}` : `AI: ${m.content}`
-      ).join('\n') + '\n\n'
-    : '';
-  const enrichedQuery = contextPrefix
-    ? `${contextPrefix}User: ${englishQuestion}`
+  // 4. 質問タイプを6種類に分類して、構造・検索パラメータを動的調整
+  type QueryType = 'overview' | 'definition' | 'mechanism' | 'comparison' | 'practical' | 'research';
+
+  function detectQueryType(q: string): QueryType {
+    if (/評価|指標|ベンチマーク|貢献|限界|再現|データセット|ablation|先行研究|sota|state.of.the.art|実験結果|精度は|スコア/i.test(q)) return 'research';
+    if (/比較|違い|差|vs\b|versus|どっち|どれ|おすすめ|選び方|使い分け/i.test(q)) return 'comparison';
+    if (/実装|使い方|手順|どうやって|ツール|コード|導入|やり方|進め方/i.test(q)) return 'practical';
+    if (/仕組み|原理|なぜ|どのように動く|アーキテクチャ|アルゴリズム|メカニズム|内部/i.test(q)) return 'mechanism';
+    if (/とは|定義|意味|概念|とはなにか|what is/i.test(q)) return 'definition';
+    return 'overview'; // 最新動向・サーベイ・その他
+  }
+
+  interface QueryConfig {
+    pageSize: number;
+    summaryResultCount: number;
+    preamble: string;
+  }
+
+  const queryConfigs: Record<QueryType, QueryConfig> = {
+    overview: {
+      pageSize: 7,
+      summaryResultCount: 5,
+      preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
+Do NOT repeat the same information across sections. Each section must add new content.
+If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+
+## 概要
+1-2 sentences summarizing the current state or trend.
+
+## 背景・重要性
+Background and motivation. Why does this topic matter? [cite sources]
+
+## 主な手法・研究
+- Method or finding 1 [1]
+- Method or finding 2 [2]
+- Method or finding 3 [3]
+
+Write in natural Japanese. No repetition between sections.`,
+    },
+
+    definition: {
+      pageSize: 4,
+      summaryResultCount: 3,
+      preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
+Do NOT repeat the same information across sections.
+If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+
+## 定義
+One clear definition sentence.
+
+## 特徴・構成要素
+- Feature 1 [1]
+- Feature 2 [2]
+
+## 類似概念との違い
+Brief comparison with related terms or methods. [cite if available]
+
+Write in natural Japanese. Keep it concise and precise.`,
+    },
+
+    mechanism: {
+      pageSize: 4,
+      summaryResultCount: 3,
+      preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
+Do NOT repeat the same information across sections. Each bullet must add NEW evidence.
+If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+
+## 結論
+One sentence directly answering how it works.
+
+## 論拠
+- Point 1 with brief reason [1]
+- Point 2 with brief reason [2]
+- Point 3 with brief reason [3]
+
+Each bullet should state the point AND briefly explain why, using a different aspect from the others.
+Write in natural Japanese.`,
+    },
+
+    comparison: {
+      pageSize: 6,
+      summaryResultCount: 4,
+      preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
+Do NOT repeat the same information across sections.
+If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+
+## 共通点
+What both/all approaches share.
+
+## 相違点
+| 観点 | A | B |
+|---|---|---|
+| (key difference 1) | ... | ... |
+| (key difference 2) | ... | ... |
+
+## 使い分けの指針
+When to choose which, with brief reasoning. [cite sources]
+
+Write in natural Japanese.`,
+    },
+
+    practical: {
+      pageSize: 4,
+      summaryResultCount: 3,
+      preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
+Do NOT repeat the same information across sections.
+If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+
+## 概要
+One sentence describing what we are implementing or doing.
+
+## 手順
+1. Step 1 [1]
+2. Step 2 [2]
+3. Step 3
+
+## 注意点・ポイント
+- Important consideration 1
+- Important consideration 2 [cite if available]
+
+Write in natural, practical Japanese.`,
+    },
+
+    research: {
+      pageSize: 5,
+      summaryResultCount: 4,
+      preamble: `You are an AI/ML research assistant helping a researcher. Answer in Japanese using this structure.
+Do NOT repeat the same information across sections.
+If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+
+## 主な貢献
+What is novel or significant about this work? [1]
+
+## 実験・評価
+- Dataset and benchmark used
+- Key metric and result [2]
+
+## 限界と今後の課題
+- Known limitations [3]
+- Future directions mentioned by authors
+
+Write in precise, academic Japanese suitable for a researcher.`,
+    },
+  };
+
+  const queryType = detectQueryType(question);
+  const { pageSize, summaryResultCount, preamble } = queryConfigs[queryType];
+
+  // 5. 会話履歴をクエリに注入（直近2往復 = 4件まで、ユーザー発言のみ英語化）
+  // AI回答（日本語）を英語クエリに混入させると検索精度が落ちるため、
+  // ユーザー発言のみをコンテキストとして使用する
+  const recentHistory = (history ?? []).slice(-4);
+  const userOnlyContext = recentHistory
+    .filter(m => m.role === 'user')
+    .map(m => `Previous question: ${m.content}`)
+    .join('\n');
+
+  const enrichedQuery = userOnlyContext
+    ? `${userOnlyContext}\nCurrent question: ${englishQuestion}`
     : englishQuestion;
 
-  // 5. SearchServiceClient（シングルトン）で Agent Builder に問い合わせ
+  // 6. SearchServiceClient（シングルトン）で Agent Builder に問い合わせ
   const client = getSearchClient();
   const servingConfig = buildServingConfigPath();
 
@@ -62,13 +212,11 @@ export async function POST(req: Request) {
     const searchResult = await (client.search({
       servingConfig,
       query: enrichedQuery,
-      pageSize: 5,
+      pageSize,
       contentSearchSpec: {
         summarySpec: {
-          summaryResultCount: 5,
-          modelPromptSpec: {
-            preamble: 'あなたは AI・機械学習の専門家アシスタントです。検索結果をもとに、必ず日本語で詳しく回答してください。',
-          },
+          summaryResultCount,
+          modelPromptSpec: { preamble },
         },
         extractiveContentSpec: { maxExtractiveAnswerCount: 1 },
       },
@@ -82,6 +230,29 @@ export async function POST(req: Request) {
           fields?: {
             link?: { stringValue?: string };
             title?: { stringValue?: string };
+            extractive_answers?: {
+              listValue?: {
+                values?: Array<{
+                  structValue?: {
+                    fields?: {
+                      content?: { stringValue?: string };
+                      pageNumber?: { stringValue?: string };
+                    };
+                  };
+                }>;
+              };
+            };
+            extractive_segments?: {
+              listValue?: {
+                values?: Array<{
+                  structValue?: {
+                    fields?: {
+                      content?: { stringValue?: string };
+                    };
+                  };
+                }>;
+              };
+            };
           };
         };
       };
@@ -91,10 +262,74 @@ export async function POST(req: Request) {
     };
 
     const answer = rawResponse?.summary?.summaryText ?? '';
-    const citations = results.map(r => ({
-      title: r.document?.derivedStructData?.fields?.title?.stringValue ?? '',
-      uri: r.document?.derivedStructData?.fields?.link?.stringValue ?? '',
-    })).filter(c => c.uri);
+    const citations = results.map(r => {
+      const fields = r.document?.derivedStructData?.fields;
+      const title = fields?.title?.stringValue ?? '';
+      const uri = fields?.link?.stringValue ?? '';
+
+      // GCS パスまたは URL から arxivId を抽出（例: 2403.12345）
+      const arxivId = uri.match(/(\d{4}\.\d{4,5})/)?.[1] ?? '';
+
+      // extractive_answers → extractive_segments の順でスニペットを取得
+      const extractiveAnswers = fields?.extractive_answers?.listValue?.values ?? [];
+      const extractiveSegments = fields?.extractive_segments?.listValue?.values ?? [];
+      const snippetSource = extractiveAnswers.length > 0 ? extractiveAnswers : extractiveSegments;
+      const chunkContents = snippetSource
+        .map(v => ({ content: v.structValue?.fields?.content?.stringValue ?? '' }))
+        .filter(c => c.content.length > 0);
+
+      return { title, uri, arxivId, chunkContents };
+    }).filter(c => c.uri);
+
+    // 結果なし検知：サジェストを生成して返す
+    const NO_RESULTS_PATTERN = /no results|結果が見つかりません|try rephrasing|検索語句を修正/i;
+    if (NO_RESULTS_PATTERN.test(answer) || answer.trim() === '') {
+      // キーワード抽出（括弧・記号を除いたコア部分）
+      const keyword = question.replace(/[「」『』【】\(\)（）]/g, '').trim().slice(0, 30);
+
+      // テンプレートサジェスト
+      const suggestions = [
+        `${keyword}とは何か`,
+        `${keyword}の仕組みを教えて`,
+        `${keyword}に関連する研究`,
+      ];
+
+      // Firestore から関連論文を検索（titleJa or title にキーワード含む）
+      const db = getAdminFirestore();
+      const [byTitleJa, byTitle] = await Promise.all([
+        db.collection('documents')
+          .where('titleJa', '>=', keyword.slice(0, 6))
+          .where('titleJa', '<=', keyword.slice(0, 6) + '\uf8ff')
+          .limit(3)
+          .get(),
+        db.collection('documents')
+          .where('title', '>=', keyword.slice(0, 6))
+          .where('title', '<=', keyword.slice(0, 6) + '\uf8ff')
+          .limit(3)
+          .get(),
+      ]).catch(() => [null, null]);
+
+      const relatedDocs: Array<{ title: string; titleJa: string; arxivId: string }> = [];
+      const seenIds = new Set<string>();
+
+      for (const snap of [byTitleJa, byTitle]) {
+        if (!snap) continue;
+        for (const doc of snap.docs) {
+          const d = doc.data();
+          if (d.arxivId && !seenIds.has(d.arxivId)) {
+            seenIds.add(d.arxivId);
+            relatedDocs.push({
+              title: d.title ?? '',
+              titleJa: d.titleJa ?? '',
+              arxivId: d.arxivId ?? '',
+            });
+          }
+        }
+      }
+
+      const fallbackAnswer = `「${keyword}」に関する情報が知識ベースで見つかりませんでした。\n\nこんな質問はいかがですか？`;
+      return Response.json({ answer: fallbackAnswer, citations: [], suggestions, relatedDocs });
+    }
 
     const result = { answer, citations };
 

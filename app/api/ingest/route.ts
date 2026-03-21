@@ -101,10 +101,12 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. 要約を日本語に翻訳（arXiv 論文のみ、失敗しても続行）
+    // 3. 要約・タイトルを日本語に翻訳（arXiv 論文のみ、失敗しても続行）
     let summaryJa = '';
-    if (arxivId && meta.summary) {
-      summaryJa = await translateToJapanese(meta.summary);
+    let titleJa = '';
+    if (arxivId) {
+      if (meta.summary) summaryJa = await translateToJapanese(meta.summary);
+      if (meta.title) titleJa = await translateToJapanese(meta.title);
     }
 
     // 4. ファイルをバッファに変換してサーバーから GCS に直接アップロード
@@ -157,6 +159,7 @@ export async function POST(req: Request) {
       metadata: { source: 'manual' },
       // 書庫用メタデータ
       title: meta.title,
+      titleJa,
       summary: meta.summary,
       summaryJa,
       authors: meta.authors,

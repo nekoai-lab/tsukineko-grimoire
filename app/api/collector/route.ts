@@ -201,6 +201,7 @@ export async function POST(req: Request) {
 
         // 6. 日本語翻訳（失敗しても続行）
         const summaryJa = await translateToJapanese(summary);
+        const titleJa = await translateToJapanese(title);
 
         // 7. PDF → Markdown 変換して GCS に保存（Agent Builder 検索精度向上）
         const mdFilename = filename.replace(/\.pdf$/, '.md');
@@ -226,6 +227,7 @@ export async function POST(req: Request) {
           status: 'pending',
           uploadedAt: FieldValue.serverTimestamp(),
           title,
+          titleJa,
           summary,
           summaryJa,
           authors,
