@@ -23,6 +23,8 @@ interface Doc {
   category: string;
   arxivId: string;
   publishedAt: string;
+  tags: string[];
+  metadata?: { source?: string; docType?: string };
 }
 
 interface CategoryGroup {
@@ -104,6 +106,8 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
           category: d.category ?? '',
           arxivId: d.arxivId ?? '',
           publishedAt: d.publishedAt ?? '',
+          tags: d.tags ?? [],
+          metadata: d.metadata ?? {},
         };
       });
 
@@ -434,13 +438,8 @@ function DocCard({ doc, index, search }: { doc: Doc; index: number; search: stri
 
           {/* Badges */}
           <div className="flex flex-wrap items-center gap-1.5">
-            {doc.category && (
-              <span className="px-2 py-0.5 rounded-full bg-purple-700/25 border border-purple-500/20
-                text-purple-300/70 text-xs">
-                {doc.category}
-              </span>
-            )}
-            {doc.arxivId && (
+            {/* ソースバッジ */}
+            {doc.arxivId ? (
               <a
                 href={`https://arxiv.org/abs/${doc.arxivId}`}
                 target="_blank"
@@ -452,7 +451,38 @@ function DocCard({ doc, index, search }: { doc: Doc; index: number; search: stri
               >
                 arXiv:{doc.arxivId}
               </a>
+            ) : (
+              <span className={`px-2 py-0.5 rounded-full text-xs border
+                ${{
+                  paper:    'bg-blue-900/20 border-blue-600/20 text-blue-400/70',
+                  report:   'bg-cyan-900/20 border-cyan-600/20 text-cyan-400/70',
+                  internal: 'bg-orange-900/20 border-orange-600/20 text-orange-400/70',
+                  minutes:  'bg-yellow-900/20 border-yellow-600/20 text-yellow-400/70',
+                  other:    'bg-purple-900/20 border-purple-500/20 text-purple-400/50',
+                }[doc.metadata?.docType ?? 'other'] ?? 'bg-purple-900/20 border-purple-500/20 text-purple-400/50'}`}
+              >
+                {{'paper': '論文', 'report': '技術レポート', 'internal': '社内資料', 'minutes': '議事録', 'other': 'その他'}[doc.metadata?.docType ?? 'other'] ?? doc.metadata?.docType ?? 'その他'}
+              </span>
             )}
+            {doc.category && !doc.arxivId && (
+              <span className="px-2 py-0.5 rounded-full bg-purple-700/25 border border-purple-500/20
+                text-purple-300/70 text-xs">
+                {doc.category}
+              </span>
+            )}
+            {doc.category && doc.arxivId && (
+              <span className="px-2 py-0.5 rounded-full bg-purple-700/25 border border-purple-500/20
+                text-purple-300/70 text-xs">
+                {doc.category}
+              </span>
+            )}
+            {/* タグ */}
+            {doc.tags?.map(tag => (
+              <span key={tag} className="px-2 py-0.5 rounded-full bg-purple-900/15 border border-purple-500/15
+                text-purple-400/50 text-xs">
+                #{tag}
+              </span>
+            ))}
           </div>
 
           {/* Authors + date */}

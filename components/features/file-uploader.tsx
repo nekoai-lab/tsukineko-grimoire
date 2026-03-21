@@ -1,16 +1,24 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { Upload, ArrowLeft } from 'lucide-react';
+import { Upload, Search, FileText, BookOpen, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { formatBytes } from '@/lib/utils';
 import Link from 'next/link';
 
-interface PendingFile {
-  file: File;
+// ─── 型定義 ──────────────────────────────────────────────────────
+
+type Tab = 'arxiv' | 'other';
+
+interface OtherMeta {
   title: string;
-  isArxiv: boolean;
+  titleJa: string;
+  authors: string;
+  summary: string;
+  docType: string;
+  publishedAt: string;
+  tags: string;
 }
 
 interface FileUploaderProps {
@@ -18,42 +26,147 @@ interface FileUploaderProps {
   onSuccess?: () => void;
 }
 
-function detectArxivId(filename: string): string | null {
-  const match = filename.match(/(\d{4}\.\d{4,5})(v\d+)?/);
-  return match ? match[1] : null;
+const DOC_TYPES = [
+  { value: 'paper',    label: '論文' },
+  { value: 'report',   label: '技術レポート' },
+  { value: 'internal', label: '社内資料' },
+  { value: 'minutes',  label: '議事録' },
+  { value: 'other',    label: 'その他' },
+] as const;
+
+// ─── arXiv ID 入力タブ ────────────────────────────────────────────
+
+function ArxivIdTab({ onSuccess }: { onSuccess?: () => void }) {
+  const [arxivId, setArxivId] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    const cleaned = arxivId.trim().replace(/^https?:\/\/arxiv\.org\/(abs|pdf)\//, '').replace(/\.pdf$/, '').replace(/v\d+$/, '');
+    if (!cleaned) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/collector', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ arxivId: cleaned }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error ?? '取り込みに失敗しました');
+        return;
+      }
+
+      if (data.skipped > 0) {
+        toast.info(`arXiv:${cleaned} は既に書庫に登録済みです`);
+      } else {
+        toast.success(`✨ arXiv:${cleaned} を取り込みました`, {
+          description: data.results?.[0]?.title ?? '',
+        });
+        setArxivId('');
+        onSuccess?.();
+      }
+    } catch {
+      toast.error('取り込み中にエラーが発生しました');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-purple-300/60 text-xs leading-relaxed">
+        arXiv の論文 ID または URL を入力してください。<br />
+        タイトル・著者・要約を自動取得し、HTML 版でインデックスします。
+      </p>
+
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400/50" />
+          <input
+            type="text"
+            value={arxivId}
+            onChange={e => setArxivId(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !loading) handleSubmit(); }}
+            placeholder="2403.10131 または https://arxiv.org/abs/2403.10131"
+            className="w-full bg-purple-900/20 border border-purple-500/30 rounded-lg
+              pl-9 pr-3 py-2.5 text-purple-100 text-sm placeholder-purple-500/40
+              focus:outline-none focus:border-purple-400/60 transition-colors"
+            disabled={loading}
+          />
+        </div>
+        <button
+          onClick={handleSubmit}
+          disabled={!arxivId.trim() || loading}
+          className="glow-button px-4 py-2 text-sm disabled:opacity-40 flex-shrink-0"
+        >
+          {loading ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-3 h-3 border border-purple-300 border-t-transparent rounded-full animate-spin" />
+              取得中
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <Upload size={13} />
+              追加
+            </span>
+          )}
+        </button>
+      </div>
+
+      <div className="bg-purple-900/15 border border-purple-500/15 rounded-lg p-3 text-purple-400/50 text-xs space-y-1">
+        <p>📌 対応フォーマット例</p>
+        <p className="font-mono">2403.10131 · 2401.04088v2</p>
+        <p className="font-mono">https://arxiv.org/abs/2403.10131</p>
+      </div>
+    </div>
+  );
 }
 
-export function FileUploader({ onSuccess }: FileUploaderProps) {
+// ─── その他文書アップロードタブ ───────────────────────────────────
+
+function OtherDocTab({ onSuccess }: { onSuccess?: () => void }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [pending, setPending] = useState<PendingFile | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [meta, setMeta] = useState<OtherMeta>({
+    title: '', titleJa: '', authors: '', summary: '',
+    docType: 'paper', publishedAt: '', tags: '',
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = useCallback((file: File) => {
-    const arxivId = detectArxivId(file.name);
-    if (arxivId) {
-      setPending({ file, title: '', isArxiv: true });
-    } else {
-      setPending({ file, title: file.name.replace(/\.[^.]+$/, ''), isArxiv: false });
-    }
-  }, []);
+  const setField = (key: keyof OtherMeta) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setMeta(prev => ({ ...prev, [key]: e.target.value }));
 
-  const uploadFile = useCallback(async () => {
-    if (!pending) return;
+  const handleFile = (f: File) => {
+    setFile(f);
+    if (!meta.title) setMeta(prev => ({ ...prev, title: f.name.replace(/\.[^.]+$/, '') }));
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  };
+
+  const handleUpload = async () => {
+    if (!file || !meta.title.trim()) return;
     setUploading(true);
-    setProgress(0);
 
     try {
       const formData = new FormData();
-      formData.append('file', pending.file);
-      if (!pending.isArxiv && pending.title) {
-        formData.append('title', pending.title);
-      }
+      formData.append('file', file);
+      formData.append('title', meta.title);
+      formData.append('titleJa', meta.titleJa);
+      formData.append('authors', meta.authors);
+      formData.append('summary', meta.summary);
+      formData.append('docType', meta.docType);
+      formData.append('publishedAt', meta.publishedAt);
+      formData.append('tags', meta.tags);
 
-      setProgress(30);
       const res = await fetch('/api/ingest', { method: 'POST', body: formData });
-      setProgress(85);
       const data = await res.json();
 
       if (!res.ok) {
@@ -61,186 +174,188 @@ export function FileUploader({ onSuccess }: FileUploaderProps) {
         return;
       }
 
-      setProgress(100);
-      const displayTitle = data.title ?? pending.file.name;
-      toast.success(`✨ "${displayTitle}" を取り込みました`, {
-        description: data.arxivId
-          ? `arXiv:${data.arxivId} のメタデータを自動取得しました`
-          : 'インデックス化には最大48時間かかります',
+      toast.success(`✨ "${meta.title}" を取り込みました`, {
+        description: 'インデックス化には最大48時間かかります',
       });
-
-      setPending(null);
+      setFile(null);
+      setMeta({ title: '', titleJa: '', authors: '', summary: '', docType: 'paper', publishedAt: '', tags: '' });
       onSuccess?.();
     } catch {
       toast.error('アップロード中にエラーが発生しました');
     } finally {
       setUploading(false);
-      setProgress(0);
     }
-  }, [pending, onSuccess]);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragging(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFileSelect(file);
-    },
-    [handleFileSelect]
-  );
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFileSelect(file);
-    e.target.value = '';
   };
 
+  const inputClass = `w-full bg-purple-900/20 border border-purple-500/30 rounded-lg px-3 py-2
+    text-purple-100 text-sm placeholder-purple-500/40
+    focus:outline-none focus:border-purple-400/60 transition-colors`;
+  const labelClass = 'text-purple-300/60 text-xs';
+
   return (
-    <div className="space-y-5">
-      {/* Pending: confirm/title input */}
-      <AnimatePresence>
-        {pending && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="glass-panel border border-purple-500/40 rounded-xl p-5 space-y-4"
-          >
-            <div className="flex items-start gap-3">
-              <span className="text-2xl">📄</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-purple-100/90 text-sm font-medium truncate">{pending.file.name}</p>
-                <p className="text-purple-300/50 text-xs mt-0.5">{formatBytes(pending.file.size)}</p>
-              </div>
-            </div>
-
-            {pending.isArxiv ? (
-              <div className="bg-green-900/15 border border-green-600/20 rounded-lg p-3
-                flex items-start gap-2">
-                <span className="text-green-400 text-sm mt-0.5">✓</span>
-                <p className="text-purple-200/70 text-xs leading-relaxed">
-                  arXiv 論文を検出しました。<br />
-                  タイトル・著者・要約・カテゴリを自動取得します。
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <label className="text-purple-300/60 text-xs">タイトル</label>
-                <input
-                  type="text"
-                  value={pending.title}
-                  onChange={e => setPending(prev => prev ? { ...prev, title: e.target.value } : null)}
-                  placeholder="ドキュメントのタイトルを入力"
-                  className="w-full bg-purple-900/20 border border-purple-500/30 rounded-lg px-3 py-2
-                    text-purple-100 text-sm placeholder-purple-500/40 focus:outline-none
-                    focus:border-purple-400/60 transition-colors"
-                  autoFocus
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && pending.title.trim()) uploadFile();
-                  }}
-                />
-              </div>
-            )}
-
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setPending(null)}
-                className="px-4 py-1.5 text-xs text-purple-300/60 hover:text-purple-300
-                  border border-purple-500/20 rounded-lg transition-colors"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={uploadFile}
-                disabled={!pending.isArxiv && !pending.title.trim()}
-                className="glow-button px-4 py-1.5 text-xs disabled:opacity-40"
-              >
-                <Upload size={11} className="inline mr-1.5" />
-                取り込む
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Drop zone */}
-      {!pending && (
+    <div className="space-y-4">
+      {/* ファイルドロップゾーン */}
+      {!file ? (
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          onClick={() => !uploading && fileInputRef.current?.click()}
-          className={`
-            glass-panel border-2 border-dashed rounded-xl p-12 flex flex-col items-center
+          onClick={() => fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center
             justify-center text-center cursor-pointer transition-all duration-300
             ${dragging
-              ? 'border-purple-400 shadow-[0_0_30px_rgba(167,139,250,0.3)] bg-purple-900/10'
-              : 'border-purple-500/30 hover:border-purple-400/50'}
-            ${uploading ? 'opacity-60 cursor-not-allowed' : ''}
-          `}
+              ? 'border-purple-400 bg-purple-900/10'
+              : 'border-purple-500/25 hover:border-purple-400/40'}`}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.md,.txt"
-            className="hidden"
-            onChange={handleFileChange}
-            disabled={uploading}
-          />
-
-          <motion.div
-            animate={dragging ? { scale: 1.2 } : { scale: 1, y: [0, -6, 0] }}
-            transition={
-              dragging
-                ? { duration: 0.2 }
-                : { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }
-            }
-            className="text-5xl mb-4"
-          >
-            📜
-          </motion.div>
-
-          {uploading ? (
-            <div className="w-full max-w-xs">
-              <p className="text-purple-200/70 text-sm mb-3">取り込んでいます...</p>
-              <div className="h-1.5 bg-purple-900/40 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-purple-600 to-purple-400 rounded-full"
-                  initial={{ width: '0%' }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.4 }}
-                />
-              </div>
-            </div>
-          ) : (
-            <>
-              <p className="text-purple-200/70 text-base mb-1">
-                {dragging ? '✨ ここにドロップ' : 'PDF / Markdown をドロップ'}
-              </p>
-              <p className="text-purple-300/40 text-xs">
-                最大 {process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? '100'}MB
-              </p>
-              <button
-                onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                className="mt-5 glow-button px-5 py-2 text-sm"
-              >
-                <Upload size={14} className="inline mr-2" />
-                ファイルを選択
-              </button>
-            </>
-          )}
+          <input ref={fileInputRef} type="file" accept=".pdf,.md,.txt" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
+          <FileText size={32} className="text-purple-400/30 mb-3" />
+          <p className="text-purple-300/60 text-sm">PDF / Markdown をドロップ</p>
+          <p className="text-purple-400/40 text-xs mt-1">またはクリックして選択</p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 bg-purple-900/20 border border-purple-500/20 rounded-xl p-3">
+          <FileText size={18} className="text-purple-400/60 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-purple-100/80 text-sm truncate">{file.name}</p>
+            <p className="text-purple-400/40 text-xs">{formatBytes(file.size)}</p>
+          </div>
+          <button onClick={() => setFile(null)} className="text-purple-400/40 hover:text-purple-300/60 transition-colors">
+            <X size={14} />
+          </button>
         </div>
       )}
 
-      {/* Back link */}
+      {/* メタデータフォーム */}
+      <div className="space-y-3">
+        {/* タイトル */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label className={labelClass}>タイトル（英語）<span className="text-red-400 ml-0.5">*</span></label>
+            <input type="text" value={meta.title} onChange={setField('title')}
+              placeholder="Document title" className={inputClass} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>タイトル（日本語）</label>
+            <input type="text" value={meta.titleJa} onChange={setField('titleJa')}
+              placeholder="文書タイトル" className={inputClass} />
+          </div>
+        </div>
+
+        {/* 文書種別 + 作成日 */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label className={labelClass}>文書種別</label>
+            <select value={meta.docType} onChange={setField('docType')}
+              className={inputClass + ' cursor-pointer'}>
+              {DOC_TYPES.map(d => (
+                <option key={d.value} value={d.value}>{d.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>作成日</label>
+            <input type="date" value={meta.publishedAt} onChange={setField('publishedAt')}
+              className={inputClass} />
+          </div>
+        </div>
+
+        {/* 著者 */}
+        <div className="space-y-1">
+          <label className={labelClass}>著者 / 作成者（カンマ区切り）</label>
+          <input type="text" value={meta.authors} onChange={setField('authors')}
+            placeholder="山田 太郎, 佐藤 花子" className={inputClass} />
+        </div>
+
+        {/* 概要 */}
+        <div className="space-y-1">
+          <label className={labelClass}>概要（任意）</label>
+          <textarea value={meta.summary} onChange={setField('summary')}
+            placeholder="この文書の内容を簡単に説明..."
+            rows={3}
+            className={inputClass + ' resize-none'} />
+        </div>
+
+        {/* タグ */}
+        <div className="space-y-1">
+          <label className={labelClass}>タグ（カンマ区切り）</label>
+          <input type="text" value={meta.tags} onChange={setField('tags')}
+            placeholder="RAG, LLM, 社内プロジェクト名" className={inputClass} />
+        </div>
+      </div>
+
+      <button
+        onClick={handleUpload}
+        disabled={!file || !meta.title.trim() || uploading}
+        className="w-full glow-button py-2.5 text-sm disabled:opacity-40"
+      >
+        {uploading ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="w-3.5 h-3.5 border border-purple-300 border-t-transparent rounded-full animate-spin" />
+            取り込んでいます...
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-2">
+            <Upload size={14} />
+            取り込む
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+// ─── メインコンポーネント ─────────────────────────────────────────
+
+export function FileUploader({ onSuccess }: FileUploaderProps) {
+  const [tab, setTab] = useState<Tab>('arxiv');
+
+  const tabClass = (t: Tab) =>
+    `flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg
+     transition-all duration-200
+     ${tab === t
+       ? 'bg-purple-700/40 text-purple-100 shadow-inner'
+       : 'text-purple-400/60 hover:text-purple-300/80'}`;
+
+  return (
+    <div className="space-y-5">
+      {/* タブ */}
+      <div className="flex gap-1 bg-purple-900/20 border border-purple-500/20 rounded-xl p-1">
+        <button className={tabClass('arxiv')} onClick={() => setTab('arxiv')}>
+          <BookOpen size={13} />
+          arXiv 論文
+        </button>
+        <button className={tabClass('other')} onClick={() => setTab('other')}>
+          <FileText size={13} />
+          その他の文書
+        </button>
+      </div>
+
+      {/* タブコンテンツ */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.15 }}
+          className="glass-panel border border-purple-500/30 rounded-xl p-5"
+        >
+          {tab === 'arxiv'
+            ? <ArxivIdTab onSuccess={onSuccess} />
+            : <OtherDocTab onSuccess={onSuccess} />
+          }
+        </motion.div>
+      </AnimatePresence>
+
+      {/* 戻るリンク */}
       <div className="text-center">
         <Link
           href="/archive"
           className="inline-flex items-center gap-1.5 text-xs text-purple-400/50
             hover:text-purple-300/70 transition-colors"
         >
-          <ArrowLeft size={12} />
-          書庫に戻る
+          ← 書庫に戻る
         </Link>
       </div>
     </div>

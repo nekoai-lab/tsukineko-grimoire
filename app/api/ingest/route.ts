@@ -63,7 +63,13 @@ export async function POST(req: Request) {
 
   const formData = await req.formData();
   const file = formData.get('file') as File | null;
-  const manualTitle = (formData.get('title') as string | null)?.trim() ?? '';
+  const manualTitle    = (formData.get('title') as string | null)?.trim() ?? '';
+  const manualTitleJa  = (formData.get('titleJa') as string | null)?.trim() ?? '';
+  const manualAuthors  = (formData.get('authors') as string | null)?.trim() ?? '';
+  const manualSummary  = (formData.get('summary') as string | null)?.trim() ?? '';
+  const manualDocType  = (formData.get('docType') as string | null)?.trim() ?? '';
+  const manualDate     = (formData.get('publishedAt') as string | null)?.trim() ?? '';
+  const manualTags     = (formData.get('tags') as string | null)?.trim() ?? '';
 
   if (!file) {
     return Response.json({ error: 'ファイルが見つかりません' }, { status: 400 });
@@ -102,12 +108,12 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. 要約・タイトルを日本語に翻訳（arXiv 論文のみ、失敗しても続行）
-    let summaryJa = '';
-    let titleJa = '';
+    // 3. 要約・タイトルを日本語に翻訳（arXiv 論文は自動翻訳、それ以外は手動入力を優先）
+    let summaryJa = manualSummary; // 手動入力があれば優先
+    let titleJa   = manualTitleJa; // 手動入力があれば優先
     if (arxivId) {
-      if (meta.summary) summaryJa = await translateToJapanese(meta.summary);
-      if (meta.title) titleJa = await translateToJapanese(meta.title);
+      if (!summaryJa && meta.summary) summaryJa = await translateToJapanese(meta.summary);
+      if (!titleJa && meta.title)     titleJa   = await translateToJapanese(meta.title);
     }
 
     // 4. ファイルをバッファに変換してサーバーから GCS に直接アップロード
@@ -153,6 +159,14 @@ export async function POST(req: Request) {
       }
     }
 
+    // 非 arXiv 文書の手動メタデータを整形
+    const parsedAuthors = !arxivId && manualAuthors
+      ? manualAuthors.split(',').map(a => a.trim()).filter(Boolean)
+      : meta.authors;
+    const parsedTags = manualTags
+      ? manualTags.split(',').map(t => t.trim()).filter(Boolean)
+      : [];
+
     // 6. Firestore にメタデータを保存
     const db = getAdminFirestore();
     const docRef = await db.collection('documents').add({
@@ -163,17 +177,20 @@ export async function POST(req: Request) {
       mimeType,
       status: 'pending',
       uploadedAt: FieldValue.serverTimestamp(),
-      metadata: { source: 'manual' },
+      metadata: {
+        source: arxivId ? 'arxiv' : 'manual',
+        docType: manualDocType || (arxivId ? 'paper' : 'other'),
+      },
       // 書庫用メタデータ
       title: meta.title,
       titleJa,
-      summary: meta.summary,
+      summary: manualSummary || meta.summary,
       summaryJa,
-      authors: meta.authors,
-      category: meta.category,
-      publishedAt: meta.publishedAt,
+      authors: parsedAuthors,
+      category: meta.category || manualDocType,
+      publishedAt: meta.publishedAt || manualDate,
       arxivId: arxivId ?? '',
-      tags: [],
+      tags: parsedTags,
     });
 
     return Response.json({
