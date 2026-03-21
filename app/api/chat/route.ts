@@ -67,17 +67,18 @@ export async function POST(req: Request) {
       preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
 Do NOT repeat the same information across sections. Each section must add new content.
 If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+Add citation numbers like [1][2] after each sentence or bullet that references a source.
 
 ## 概要
-1-2 sentences summarizing the current state or trend.
+1-2 sentences summarizing the current state or trend. [cite]
 
 ## 背景・重要性
-Background and motivation. Why does this topic matter? [cite sources]
+Background and motivation. Why does this topic matter? [cite]
 
 ## 主な手法・研究
-- Method or finding 1 [1]
-- Method or finding 2 [2]
-- Method or finding 3 [3]
+- Method or finding 1 [cite]
+- Method or finding 2 [cite]
+- Method or finding 3 [cite]
 
 Write in natural Japanese. No repetition between sections.`,
     },
@@ -88,16 +89,17 @@ Write in natural Japanese. No repetition between sections.`,
       preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
 Do NOT repeat the same information across sections.
 If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+Add citation numbers like [1][2] after each sentence or bullet that references a source.
 
 ## 定義
-One clear definition sentence.
+One clear definition sentence. [cite]
 
 ## 特徴・構成要素
-- Feature 1 [1]
-- Feature 2 [2]
+- Feature 1 [cite]
+- Feature 2 [cite]
 
 ## 類似概念との違い
-Brief comparison with related terms or methods. [cite if available]
+Brief comparison with related terms or methods. [cite]
 
 Write in natural Japanese. Keep it concise and precise.`,
     },
@@ -108,14 +110,15 @@ Write in natural Japanese. Keep it concise and precise.`,
       preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
 Do NOT repeat the same information across sections. Each bullet must add NEW evidence.
 If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+Add citation numbers like [1][2] after each sentence or bullet that references a source.
 
 ## 結論
-One sentence directly answering how it works.
+One sentence directly answering how it works. [cite]
 
 ## 論拠
-- Point 1 with brief reason [1]
-- Point 2 with brief reason [2]
-- Point 3 with brief reason [3]
+- Point 1 with brief reason [cite]
+- Point 2 with brief reason [cite]
+- Point 3 with brief reason [cite]
 
 Each bullet should state the point AND briefly explain why, using a different aspect from the others.
 Write in natural Japanese.`,
@@ -127,9 +130,10 @@ Write in natural Japanese.`,
       preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
 Do NOT repeat the same information across sections.
 If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+Add citation numbers like [1][2] after each sentence or bullet that references a source.
 
 ## 共通点
-What both/all approaches share.
+What both/all approaches share. [cite]
 
 ## 相違点
 | 観点 | A | B |
@@ -138,7 +142,7 @@ What both/all approaches share.
 | (key difference 2) | ... | ... |
 
 ## 使い分けの指針
-When to choose which, with brief reasoning. [cite sources]
+When to choose which, with brief reasoning. [cite]
 
 Write in natural Japanese.`,
     },
@@ -149,18 +153,19 @@ Write in natural Japanese.`,
       preamble: `You are an AI/ML research assistant. Answer in Japanese using this structure.
 Do NOT repeat the same information across sections.
 If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+Add citation numbers like [1][2] after each sentence or bullet that references a source.
 
 ## 概要
-One sentence describing what we are implementing or doing.
+One sentence describing what we are implementing or doing. [cite]
 
 ## 手順
-1. Step 1 [1]
-2. Step 2 [2]
+1. Step 1 [cite]
+2. Step 2 [cite]
 3. Step 3
 
 ## 注意点・ポイント
-- Important consideration 1
-- Important consideration 2 [cite if available]
+- Important consideration 1 [cite]
+- Important consideration 2 [cite]
 
 Write in natural, practical Japanese.`,
     },
@@ -171,16 +176,17 @@ Write in natural, practical Japanese.`,
       preamble: `You are an AI/ML research assistant helping a researcher. Answer in Japanese using this structure.
 Do NOT repeat the same information across sections.
 If information for a section is not found in the search results, omit that section entirely. Do not write "information is not available."
+Add citation numbers like [1][2] after each sentence or bullet that references a source.
 
 ## 主な貢献
-What is novel or significant about this work? [1]
+What is novel or significant about this work? [cite]
 
 ## 実験・評価
-- Dataset and benchmark used
-- Key metric and result [2]
+- Dataset and benchmark used [cite]
+- Key metric and result [cite]
 
 ## 限界と今後の課題
-- Known limitations [3]
+- Known limitations [cite]
 - Future directions mentioned by authors
 
 Write in precise, academic Japanese suitable for a researcher.`,
@@ -216,6 +222,7 @@ Write in precise, academic Japanese suitable for a researcher.`,
       contentSearchSpec: {
         summarySpec: {
           summaryResultCount,
+          includeCitations: true,
           modelPromptSpec: { preamble },
         },
         extractiveContentSpec: { maxExtractiveAnswerCount: 1 },
@@ -267,8 +274,12 @@ Write in precise, academic Japanese suitable for a researcher.`,
       const title = fields?.title?.stringValue ?? '';
       const uri = fields?.link?.stringValue ?? '';
 
-      // GCS パスまたは URL から arxivId を抽出（例: 2403.12345）
-      const arxivId = uri.match(/(\d{4}\.\d{4,5})/)?.[1] ?? '';
+      // GCS パスまたはファイル名から arxivId を抽出（例: 2403.12345）
+      // URI → title の順で試みる（ファイル名形式 arxiv_2403.12345_... にも対応）
+      const arxivId =
+        uri.match(/(\d{4}\.\d{4,5})/)?.[1] ??
+        title.match(/(\d{4}\.\d{4,5})/)?.[1] ??
+        '';
 
       // extractive_answers → extractive_segments の順でスニペットを取得
       const extractiveAnswers = fields?.extractive_answers?.listValue?.values ?? [];
@@ -278,8 +289,37 @@ Write in precise, academic Japanese suitable for a researcher.`,
         .map(v => ({ content: v.structValue?.fields?.content?.stringValue ?? '' }))
         .filter(c => c.content.length > 0);
 
-      return { title, uri, arxivId, chunkContents };
+      return { title, uri, arxivId, chunkContents, titleJa: '', publishedAt: '' };
     }).filter(c => c.uri);
+
+    // Firestore から titleJa・publishedAt を一括取得して citations に追加
+    const arxivIdsToFetch = citations.map(c => c.arxivId).filter(Boolean);
+    if (arxivIdsToFetch.length > 0) {
+      try {
+        const titleDb = getAdminFirestore();
+        const titleSnap = await titleDb.collection('documents')
+          .where('arxivId', 'in', arxivIdsToFetch.slice(0, 10))
+          .get();
+        const metaMap: Record<string, { titleJa: string; publishedAt: string }> = {};
+        titleSnap.docs.forEach(doc => {
+          const d = doc.data();
+          if (d.arxivId) {
+            metaMap[d.arxivId] = {
+              titleJa: d.titleJa ?? '',
+              publishedAt: d.publishedAt ?? '',
+            };
+          }
+        });
+        citations.forEach(c => {
+          if (c.arxivId && metaMap[c.arxivId]) {
+            c.titleJa = metaMap[c.arxivId].titleJa;
+            c.publishedAt = metaMap[c.arxivId].publishedAt;
+          }
+        });
+      } catch {
+        // メタデータ取得失敗は無視（フォールバック表示を使用）
+      }
+    }
 
     // 結果なし検知
     const NO_RESULTS_PATTERN = /no results|結果が見つかりません|try rephrasing|検索語句を修正/i;

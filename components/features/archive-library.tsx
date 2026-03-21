@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, BookOpen, Users, Calendar, CheckCircle, XCircle, Clock, ExternalLink, ChevronRight, Plus } from 'lucide-react';
+import { Search, BookOpen, Users, Calendar, CheckCircle, XCircle, Clock, ExternalLink, ChevronRight } from 'lucide-react';
 import { getClientDb } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import { formatBytes } from '@/lib/utils';
@@ -16,6 +16,7 @@ interface Doc {
   status: 'pending' | 'indexed' | 'failed';
   uploadedAt: string | null;
   title: string;
+  titleJa: string;
   summary: string;
   summaryJa: string;
   authors: string[];
@@ -74,6 +75,7 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string>('all');   // category filter
   const [search, setSearch] = useState('');
+  const [fullText, setFullText] = useState(false); // false=タイトル検索 / true=全文検索
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -95,6 +97,7 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
           status: d.status ?? 'pending',
           uploadedAt: d.uploadedAt?.toDate?.()?.toISOString() ?? null,
           title: d.title ?? d.filename ?? '',
+          titleJa: d.titleJa ?? '',
           summary: d.summary ?? '',
           summaryJa: d.summaryJa ?? '',
           authors: d.authors ?? [],
@@ -135,16 +138,19 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
         selected === 'all' ||
         doc.category === selected ||
         (selected === 'other' && !doc.category);
-      const q = search.toLowerCase();
+      const q = search.toLowerCase().trim();
       const matchSearch =
         !q ||
         doc.title.toLowerCase().includes(q) ||
-        doc.summary.toLowerCase().includes(q) ||
-        doc.summaryJa.toLowerCase().includes(q) ||
-        doc.authors.some(a => a.toLowerCase().includes(q));
+        doc.titleJa.toLowerCase().includes(q) ||
+        (fullText && (
+          doc.summary.toLowerCase().includes(q) ||
+          doc.summaryJa.toLowerCase().includes(q) ||
+          doc.authors.some(a => a.toLowerCase().includes(q))
+        ));
       return matchCat && matchSearch;
     });
-  }, [docs, selected, search]);
+  }, [docs, selected, search, fullText]);
 
   const toggleGroup = (prefix: string) => {
     setExpanded(prev => {
@@ -219,15 +225,8 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-52 lg:w-60 flex-shrink-0 border-r border-purple-500/15
         p-3 overflow-y-auto">
-        <div className="flex items-center justify-between mb-3 px-1">
+        <div className="mb-3 px-1">
           <span className="text-purple-300/50 text-xs uppercase tracking-wider">書庫</span>
-          <Link
-            href="/archive/upload"
-            className="flex items-center gap-1 text-xs text-purple-400/60 hover:text-purple-300
-              transition-colors"
-          >
-            <Plus size={12} /> 追加
-          </Link>
         </div>
         {Sidebar}
       </aside>
@@ -271,32 +270,52 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
           </button>
 
           <div className="relative flex-1">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400/40" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400/70" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="タイトル・著者・要約を検索..."
-              className="w-full bg-purple-900/10 border border-purple-500/20 rounded-lg
-                pl-8 pr-3 py-2 text-purple-100 text-sm placeholder-purple-500/40
-                focus:outline-none focus:border-purple-400/50 transition-colors"
+              placeholder={fullText ? 'タイトル・要約・著者を検索...' : 'タイトルを検索...'}
+              className="w-full bg-purple-900/25 border border-purple-500/50 rounded-lg
+                pl-9 pr-3 py-2 text-purple-100 text-sm placeholder-purple-400/50
+                focus:outline-none focus:border-purple-400/80 focus:bg-purple-900/35
+                transition-colors"
             />
           </div>
 
-          <Link
-            href="/archive/upload"
-            className="flex-shrink-0 flex items-center gap-1.5 glow-button px-3 py-2 text-xs"
+          {/* 詳細検索トグル */}
+          <button
+            onClick={() => setFullText(f => !f)}
+            title={fullText ? '要約・著者も検索中（クリックでタイトルのみに戻す）' : 'タイトルのみ検索（クリックで要約・著者も検索）'}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg
+              border text-xs transition-all
+              ${fullText
+                ? 'bg-purple-700/40 border-purple-400/60 text-purple-200'
+                : 'bg-transparent border-purple-500/25 text-purple-400/60 hover:border-purple-400/40 hover:text-purple-300/80'
+              }`}
           >
-            <Plus size={13} />
-            <span className="hidden sm:inline">論文を追加</span>
-          </Link>
+            <span className="hidden sm:inline">{fullText ? '全文検索中' : '詳細検索'}</span>
+            <span className="sm:hidden">🔍</span>
+          </button>
         </div>
 
-        {/* Count */}
-        <div className="px-4 pt-3 pb-1">
-          <span className="text-purple-400/40 text-xs">
-            {filteredDocs.length} 件{docs.length !== filteredDocs.length && ` / ${docs.length} 件`}
-          </span>
+        {/* Count + 検索フィードバック */}
+        <div className="px-4 pt-3 pb-1 flex items-center gap-2 flex-wrap">
+          {search.trim() ? (
+            <>
+              <span className="text-amber-300/80 text-xs font-medium">
+                「{search}」で {filteredDocs.length} 件ヒット
+              </span>
+              <span className="text-purple-500/40 text-xs">
+                ({fullText ? '全文検索' : 'タイトル検索'})
+              </span>
+              {filteredDocs.length < docs.length && (
+                <span className="text-purple-400/40 text-xs">/ 全 {docs.length} 件</span>
+              )}
+            </>
+          ) : (
+            <span className="text-purple-400/40 text-xs">{filteredDocs.length} 件</span>
+          )}
         </div>
 
         {/* Document list */}
@@ -316,13 +335,32 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
           ) : (
             <AnimatePresence initial={false}>
               {filteredDocs.map((doc, i) => (
-                <DocCard key={doc.id} doc={doc} index={i} />
+                <DocCard key={doc.id} doc={doc} index={i} search={search} />
               ))}
             </AnimatePresence>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** 検索ワードにマッチした箇所をアンバーハイライトで返す */
+function Highlight({ text, query }: { text: string; query: string }) {
+  if (!query.trim()) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <mark key={i} className="bg-amber-400/30 text-amber-200 rounded-sm px-0.5 not-italic">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
   );
 }
 
@@ -353,7 +391,8 @@ function SidebarItem({
   );
 }
 
-function DocCard({ doc, index }: { doc: Doc; index: number }) {
+function DocCard({ doc, index, search }: { doc: Doc; index: number; search: string }) {
+  const [expanded, setExpanded] = useState(false);
   const displaySummary = doc.summaryJa || doc.summary;
 
   return (
@@ -361,7 +400,8 @@ function DocCard({ doc, index }: { doc: Doc; index: number }) {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.03, 0.3) }}
-      className="scroll-card group"
+      onClick={() => setExpanded(e => !e)}
+      className="scroll-card group cursor-pointer select-none"
     >
       <div className="flex items-start gap-3">
         <BookOpen size={15} className="text-purple-400/40 flex-shrink-0 mt-0.5" />
@@ -369,10 +409,27 @@ function DocCard({ doc, index }: { doc: Doc; index: number }) {
 
           {/* Title row */}
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-purple-100/90 text-sm font-medium leading-snug">
-              {doc.title || doc.filename}
-            </h3>
-            <StatusBadge status={doc.status} />
+            <div className="flex-1 min-w-0 space-y-0.5">
+              {/* 日本語タイトル（メイン） */}
+              {doc.titleJa ? (
+                <>
+                  <h3 className="text-purple-100/90 text-sm font-medium leading-snug">
+                    <Highlight text={doc.titleJa} query={search} />
+                  </h3>
+                  <p className="text-purple-400/50 text-xs leading-snug">
+                    <Highlight text={doc.title || doc.filename} query={search} />
+                  </p>
+                </>
+              ) : (
+                <h3 className="text-purple-100/90 text-sm font-medium leading-snug">
+                  <Highlight text={doc.title || doc.filename} query={search} />
+                </h3>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <StatusBadge status={doc.status} />
+              <span className="text-purple-500/40 text-xs">{expanded ? '▲' : '▼'}</span>
+            </div>
           </div>
 
           {/* Badges */}
@@ -404,10 +461,10 @@ function DocCard({ doc, index }: { doc: Doc; index: number }) {
               {doc.authors.length > 0 && (
                 <span className="flex items-center gap-1">
                   <Users size={10} />
-                  {doc.authors.slice(0, 3).join(', ')}
-                  {doc.authors.length > 3 && (
-                    <span className="text-purple-400/30"> +{doc.authors.length - 3}</span>
-                  )}
+                  <Highlight
+                    text={doc.authors.slice(0, expanded ? undefined : 3).join(', ') + ((!expanded && doc.authors.length > 3) ? ` +${doc.authors.length - 3}` : '')}
+                    query={search}
+                  />
                 </span>
               )}
               {doc.publishedAt && (
@@ -421,13 +478,28 @@ function DocCard({ doc, index }: { doc: Doc; index: number }) {
 
           {/* Summary */}
           {displaySummary && (
-            <p className="text-purple-300/50 text-xs leading-relaxed line-clamp-2">
-              {displaySummary}
+            <p className={`text-purple-300/50 text-xs leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+              <Highlight text={displaySummary} query={search} />
             </p>
           )}
 
+          {/* 展開時のみ表示: 英語 abstract */}
+          {expanded && doc.summaryJa && doc.summary && (
+            <details className="mt-1">
+              <summary
+                onClick={e => e.stopPropagation()}
+                className="text-purple-500/50 text-xs cursor-pointer hover:text-purple-400/70 transition-colors"
+              >
+                英語原文を表示
+              </summary>
+              <p className="text-purple-400/40 text-xs leading-relaxed mt-1 italic">
+                {doc.summary}
+              </p>
+            </details>
+          )}
+
           {/* Action links */}
-          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          <div className="flex flex-wrap items-center gap-2 pt-0.5" onClick={e => e.stopPropagation()}>
             {doc.arxivId && (
               <a
                 href={`https://arxiv.org/html/${doc.arxivId}`}

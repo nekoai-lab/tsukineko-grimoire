@@ -4,7 +4,31 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, X, ExternalLink, BookOpen, FileText, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { MessageBubble } from './message-bubble';
+
+/** Agent Builder が返すスニペットに含まれる HTML タグを除去 */
+function stripHtml(text: string): string {
+  return text.replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
+
+/**
+ * 日本語の連続テキストを段落分けして ReactMarkdown が読みやすいマークダウンに変換。
+ * 「。」で文を分割し、2〜3文ごとに改行を挿入する。
+ */
+function formatSummaryAsMarkdown(text: string): string {
+  if (!text) return '';
+  // 「。」で区切り、空文字を除去
+  const sentences = text.split('。').map(s => s.trim()).filter(Boolean);
+  const paragraphs: string[] = [];
+  // 2文ずつ段落にまとめる
+  for (let i = 0; i < sentences.length; i += 2) {
+    const chunk = sentences.slice(i, i + 2).join('。') + '。';
+    paragraphs.push(chunk);
+  }
+  return paragraphs.join('\n\n');
+}
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -20,8 +44,10 @@ function useIsMobile() {
 
 interface Citation {
   title?: string;
+  titleJa?: string;
   uri?: string;
   arxivId?: string;
+  publishedAt?: string;
   chunkContents?: Array<{ content?: string }>;
 }
 
@@ -429,8 +455,7 @@ function CitationPanelContent({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
         {/* Title block */}
-        <div className="space-y-1">
-          {/* 日本語タイトル（メイン） */}
+        <div className="space-y-1.5">
           {enrichLoading && !enriched ? (
             <div className="flex items-center gap-2">
               <Loader2 size={11} className="animate-spin text-purple-400/50 flex-shrink-0" />
@@ -438,14 +463,15 @@ function CitationPanelContent({
             </div>
           ) : (
             <>
+              {/* 日本語タイトル（常時表示） */}
               {enriched?.titleJa && (
                 <p className="text-purple-100 text-sm font-semibold leading-snug">
                   {enriched.titleJa}
                 </p>
               )}
-              {/* 英語タイトル（サブ） */}
+              {/* 英語タイトル（常時表示・日本語がある場合はサブ扱い） */}
               <p className={enriched?.titleJa
-                ? 'text-purple-400/50 text-xs leading-snug'
+                ? 'text-purple-300/60 text-xs leading-snug'
                 : 'text-purple-100 text-sm font-semibold leading-snug'
               }>
                 {citation.title ?? 'Untitled Document'}
@@ -455,7 +481,7 @@ function CitationPanelContent({
 
           {/* Meta: 著者・年・カテゴリ */}
           {enriched && (
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-purple-400/55 text-xs mt-1">
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-purple-400/55 text-xs mt-0.5">
               {enriched.authors.length > 0 && (
                 <span>{enriched.authors.slice(0, 3).join(', ')}{enriched.authors.length > 3 ? ' et al.' : ''}</span>
               )}
@@ -469,51 +495,40 @@ function CitationPanelContent({
           )}
         </div>
 
-        {/* CTA: この論文についてグリモワールに聞く */}
-        {askTitle && (
-          <button
-            onClick={() => onAskAbout(askTitle)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
-              bg-purple-700/30 border border-purple-500/40
-              text-purple-200 text-xs font-medium
-              hover:bg-purple-600/40 hover:border-purple-400/60 hover:text-white
-              transition-all active:scale-[0.98]"
-          >
-            <BookOpen size={13} className="flex-shrink-0" />
-            <span>この論文についてグリモワールに聞く</span>
-          </button>
-        )}
-
         {/* 引用箇所（最重要：なぜ引用されたか） */}
         {snippetsToShow.length > 0 && (
           <div className="space-y-2">
             <p className="text-purple-400/60 text-xs">📌 回答で引用された箇所</p>
-            {snippetsToShow.map((s, i) => (
-              <div key={i} className="bg-purple-950/40 border border-purple-500/15 rounded-xl p-3 space-y-2">
-                {s.ja && s.ja !== s.en ? (
-                  <>
-                    <p className="text-purple-100/90 text-xs leading-relaxed">{s.ja}</p>
-                    <button
-                      onClick={() => setShowEn(prev => ({ ...prev, [i]: !prev[i] }))}
-                      className="text-purple-500/50 hover:text-purple-400/70 text-xs transition-colors"
-                    >
-                      {showEn[i] ? '原文を隠す ▲' : '英語原文を表示 ▼'}
-                    </button>
-                    {showEn[i] && (
-                      <p className="text-purple-400/50 text-xs leading-relaxed border-t border-purple-500/10 pt-2 italic">
-                        {s.en}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-purple-100/80 text-xs leading-relaxed">{s.en}</p>
-                )}
-              </div>
-            ))}
+            {snippetsToShow.map((s, i) => {
+              const cleanJa = stripHtml(s.ja);
+              const cleanEn = stripHtml(s.en);
+              return (
+                <div key={i} className="bg-purple-950/40 border border-purple-500/15 rounded-xl p-3 space-y-2">
+                  {cleanJa && cleanJa !== cleanEn ? (
+                    <>
+                      <p className="text-purple-100/90 text-xs leading-relaxed">{cleanJa}</p>
+                      <button
+                        onClick={() => setShowEn(prev => ({ ...prev, [i]: !prev[i] }))}
+                        className="text-purple-500/50 hover:text-purple-400/70 text-xs transition-colors"
+                      >
+                        {showEn[i] ? '原文を隠す ▲' : '英語原文を表示 ▼'}
+                      </button>
+                      {showEn[i] && (
+                        <p className="text-purple-400/50 text-xs leading-relaxed border-t border-purple-500/10 pt-2 italic">
+                          {cleanEn}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-purple-100/80 text-xs leading-relaxed">{cleanEn}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* 概要（折りたたみ） */}
+        {/* 概要（折りたたみ・Markdown レンダリング） */}
         {enriched?.summaryJa && (
           <div className="space-y-1.5">
             <button
@@ -525,9 +540,40 @@ function CitationPanelContent({
             </button>
             {summaryOpen && (
               <div className="bg-purple-950/30 border border-purple-500/10 rounded-xl p-3">
-                <p className="text-purple-100/80 text-xs leading-relaxed">
-                  {enriched.summaryJa}
-                </p>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({ children }) => (
+                      <p className="text-purple-100/80 text-xs leading-relaxed mb-3 last:mb-0">{children}</p>
+                    ),
+                    strong: ({ children }) => (
+                      <strong className="text-purple-200 font-semibold">{children}</strong>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="mb-2 space-y-0.5 pl-1">{children}</ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal list-inside mb-2 space-y-0.5 text-xs text-purple-100/80">{children}</ol>
+                    ),
+                    li: ({ children }) => (
+                      <li className="flex gap-1.5 text-purple-100/80 text-xs leading-relaxed">
+                        <span className="text-purple-500 mt-0.5 flex-shrink-0">▸</span>
+                        <span>{children}</span>
+                      </li>
+                    ),
+                    h1: ({ children }) => (
+                      <h1 className="text-purple-200 font-semibold text-xs mt-3 mb-1 first:mt-0">{children}</h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-purple-200 font-semibold text-xs mt-3 mb-1 first:mt-0">{children}</h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-purple-300/80 font-medium text-xs mt-2 mb-0.5">{children}</h3>
+                    ),
+                  }}
+                >
+                  {formatSummaryAsMarkdown(enriched.summaryJa)}
+                </ReactMarkdown>
               </div>
             )}
           </div>
@@ -589,6 +635,21 @@ function CitationPanelContent({
             <ExternalLink size={11} className="flex-shrink-0" />
             <span>{citation.uri}</span>
           </a>
+        )}
+
+        {/* CTA: この論文についてグリモワールに聞く（最下部） */}
+        {askTitle && (
+          <button
+            onClick={() => onAskAbout(askTitle)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+              bg-purple-700/30 border border-purple-500/40
+              text-purple-200 text-xs font-medium
+              hover:bg-purple-600/40 hover:border-purple-400/60 hover:text-white
+              transition-all active:scale-[0.98]"
+          >
+            <BookOpen size={13} className="flex-shrink-0" />
+            <span>この論文についてグリモワールに聞く</span>
+          </button>
         )}
       </div>
     </>

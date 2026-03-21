@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, Fragment } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,8 +9,56 @@ import { cn } from '@/lib/utils';
 
 interface Citation {
   title?: string;
+  titleJa?: string;
   uri?: string;
+  arxivId?: string;
+  publishedAt?: string;
   chunkContents?: Array<{ content?: string }>;
+}
+
+/**
+ * ReactMarkdown の children（ReactNode）の中から [N] / [[N]] パターンを検出し、
+ * クリックで Citation Preview を開くインライン番号ボタンに差し替える。
+ */
+function injectCitations(
+  children: React.ReactNode,
+  citations: Citation[] | undefined,
+  onCitationClick: ((c: Citation) => void) | undefined,
+): React.ReactNode {
+  const processString = (text: string, keyPrefix: string): React.ReactNode => {
+    const parts = text.split(/(\[\[?\d+\]?\])/);
+    if (parts.length === 1) return text;
+    return parts.map((part, i) => {
+      const m = part.match(/^\[{1,2}(\d+)\]{1,2}$/);
+      if (!m) return <Fragment key={`${keyPrefix}-t${i}`}>{part}</Fragment>;
+      const idx = parseInt(m[1]) - 1;
+      const c = citations?.[idx];
+      return (
+        <button
+          key={`${keyPrefix}-c${i}`}
+          onClick={(e) => { e.stopPropagation(); c && onCitationClick?.(c); }}
+          title={c?.titleJa || c?.title || `引用 ${idx + 1}`}
+          className="inline-flex items-center justify-center min-w-[15px] h-[15px] px-1 mx-0.5
+            rounded-full bg-purple-700/70 border border-purple-400/50
+            text-[9px] font-bold text-purple-100
+            hover:bg-purple-500/80 hover:border-purple-300/70 hover:text-white
+            transition-colors cursor-pointer relative -top-0.5 flex-shrink-0"
+        >
+          {m[1]}
+        </button>
+      );
+    });
+  };
+
+  if (typeof children === 'string') return processString(children, 'root');
+  if (Array.isArray(children)) {
+    return children.map((child, i) =>
+      typeof child === 'string'
+        ? <Fragment key={i}>{processString(child, `arr-${i}`)}</Fragment>
+        : child
+    );
+  }
+  return children;
 }
 
 interface RelatedDoc {
@@ -164,7 +212,9 @@ export function MessageBubble({ role, content, citations, suggestions, relatedDo
                   </h3>
                 ),
                 p: ({ children }) => (
-                  <p className="mb-3 last:mb-0 leading-relaxed text-purple-50/90">{children}</p>
+                  <p className="mb-3 last:mb-0 leading-relaxed text-purple-50/90">
+                    {injectCitations(children, citations, onCitationClick)}
+                  </p>
                 ),
                 ul: ({ children }) => (
                   <ul className="mb-3 space-y-1.5 pl-1">{children}</ul>
@@ -175,7 +225,7 @@ export function MessageBubble({ role, content, citations, suggestions, relatedDo
                 li: ({ children }) => (
                   <li className="flex gap-2 text-purple-50/85 leading-relaxed">
                     <span className="text-purple-400 mt-1 flex-shrink-0">▸</span>
-                    <span>{children}</span>
+                    <span>{injectCitations(children, citations, onCitationClick)}</span>
                   </li>
                 ),
                 blockquote: ({ children }) => (
@@ -215,32 +265,74 @@ export function MessageBubble({ role, content, citations, suggestions, relatedDo
         </div>
 
         {/* Citations */}
-        {!isUser && citations && citations.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-1 mt-0.5">
-            {citations.map((c, i) => {
-              const shortTitle = c.title
-                ? c.title.replace(/^(.*?):.*$/, '$1').trim().slice(0, 28) + (c.title.length > 28 ? '…' : '')
-                : `引用 ${i + 1}`;
-              return (
-                <button
-                  key={i}
-                  data-testid="citation"
-                  onClick={() => onCitationClick?.(c)}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-full
-                    bg-purple-950/50 border border-purple-500/25
-                    text-purple-300/70 text-xs
-                    hover:border-purple-400/50 hover:text-purple-200 hover:bg-purple-900/40
-                    transition-all max-w-[220px]"
-                >
-                  <span className="text-purple-500 font-mono font-bold text-[10px] flex-shrink-0">
-                    {i + 1}
-                  </span>
-                  <span className="truncate">{shortTitle}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {!isUser && citations && citations.length > 0 && (() => {
+          // 発表年の範囲を計算（publishedAt → arxivId 先頭2桁の順でフォールバック）
+          const years = citations
+            .map(c => {
+              const raw = c.publishedAt?.slice(0, 4);
+              if (raw && /^\d{4}$/.test(raw)) return raw;
+              const yy = c.arxivId?.match(/^(\d{2})/)?.[1];
+              return yy ? (parseInt(yy) < 90 ? `20${yy}` : `19${yy}`) : '';
+            })
+            .filter((y): y is string => !!y && /^\d{4}$/.test(y))
+            .map(Number);
+          const minYear = years.length > 0 ? Math.min(...years) : null;
+          const maxYear = years.length > 0 ? Math.max(...years) : null;
+          const yearRange = minYear && maxYear
+            ? minYear === maxYear ? `${minYear}年` : `${minYear}〜${maxYear}年`
+            : null;
+
+          return (
+            <div className="space-y-1.5 px-1 mt-0.5">
+              {/* 時期サマリー */}
+              {yearRange && (
+                <p className="text-purple-500/50 text-[10px] flex items-center gap-1">
+                  <span>📅</span>
+                  <span>{`この回答は ${yearRange} の論文 ${citations.length} 件に基づいています`}</span>
+                </p>
+              )}
+              {/* バッジ一覧 */}
+              <div className="flex flex-wrap gap-1.5">
+                {citations.map((c, i) => {
+                  const isFilename = /^arxiv_\d{4}/.test(c.title ?? '');
+                  const displayTitle =
+                    c.titleJa ||
+                    (!isFilename ? c.title?.replace(/^(.*?):.*$/, '$1').trim() : '') ||
+                    `引用 ${i + 1}`;
+                  const shortTitle = displayTitle.length > 28
+                    ? displayTitle.slice(0, 28) + '…'
+                    : displayTitle;
+                  // publishedAt が空なら arxivId の先頭2桁から年を推定（例: "24" → 2024）
+                  const rawYear = c.publishedAt?.slice(0, 4);
+                  const arxivYY = c.arxivId?.match(/^(\d{2})/)?.[1];
+                  const year = rawYear || (arxivYY ? (parseInt(arxivYY) < 90 ? `20${arxivYY}` : `19${arxivYY}`) : '');
+                  return (
+                    <button
+                      key={i}
+                      data-testid="citation"
+                      onClick={() => onCitationClick?.(c)}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-full
+                        bg-purple-950/50 border border-purple-500/25
+                        text-purple-300/70 text-xs
+                        hover:border-purple-400/50 hover:text-purple-200 hover:bg-purple-900/40
+                        transition-all max-w-[260px]"
+                    >
+                      <span className="text-purple-500 font-mono font-bold text-[10px] flex-shrink-0">
+                        {i + 1}
+                      </span>
+                      <span className="truncate">{shortTitle}</span>
+                      {year && (
+                        <span className="text-purple-500/50 text-[9px] flex-shrink-0 font-mono">
+                          {year}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Suggestions（結果なし時のサジェスト） */}
         {!isUser && suggestions && suggestions.length > 0 && (
