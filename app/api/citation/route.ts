@@ -14,6 +14,7 @@ interface CitationLinks {
 }
 
 interface CitationResponse {
+  titleJa: string;
   summaryJa: string;
   authors: string[];
   publishedAt: string;
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
     .limit(1)
     .get();
 
+  let titleJa = '';
   let summaryJa = '';
   let authors: string[] = [];
   let publishedAt = '';
@@ -59,6 +61,7 @@ export async function POST(req: Request) {
 
   if (!snapshot.empty) {
     const data = snapshot.docs[0].data();
+    titleJa = data.titleJa ?? '';
     summaryJa = data.summaryJa ?? '';
     authors = data.authors ?? [];
     publishedAt = data.publishedAt ?? '';
@@ -91,6 +94,7 @@ export async function POST(req: Request) {
   );
 
   const result: CitationResponse = {
+    titleJa,
     summaryJa,
     authors,
     publishedAt,

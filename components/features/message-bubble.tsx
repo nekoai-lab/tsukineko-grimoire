@@ -216,18 +216,29 @@ export function MessageBubble({ role, content, citations, suggestions, relatedDo
 
         {/* Citations */}
         {!isUser && citations && citations.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-1">
-            {citations.map((c, i) => (
-              <button
-                key={i}
-                data-testid="citation"
-                onClick={() => onCitationClick?.(c)}
-                title={c.title ?? `引用 ${i + 1}`}
-                className="citation-badge"
-              >
-                {i + 1}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-1.5 px-1 mt-0.5">
+            {citations.map((c, i) => {
+              const shortTitle = c.title
+                ? c.title.replace(/^(.*?):.*$/, '$1').trim().slice(0, 28) + (c.title.length > 28 ? '…' : '')
+                : `引用 ${i + 1}`;
+              return (
+                <button
+                  key={i}
+                  data-testid="citation"
+                  onClick={() => onCitationClick?.(c)}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full
+                    bg-purple-950/50 border border-purple-500/25
+                    text-purple-300/70 text-xs
+                    hover:border-purple-400/50 hover:text-purple-200 hover:bg-purple-900/40
+                    transition-all max-w-[220px]"
+                >
+                  <span className="text-purple-500 font-mono font-bold text-[10px] flex-shrink-0">
+                    {i + 1}
+                  </span>
+                  <span className="truncate">{shortTitle}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 

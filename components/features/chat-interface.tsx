@@ -32,6 +32,7 @@ interface RelatedDoc {
 }
 
 interface EnrichedCitation {
+  titleJa: string;
   summaryJa: string;
   authors: string[];
   publishedAt: string;
@@ -316,6 +317,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                 <CitationPanelContent
                   citation={selectedCitation}
                   onClose={() => setSelectedCitation(null)}
+                  onAskAbout={(query) => { setSelectedCitation(null); handleDeepDive(query); }}
                 />
               </div>
             </motion.div>
@@ -354,6 +356,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                 <CitationPanelContent
                   citation={selectedCitation}
                   onClose={() => setSelectedCitation(null)}
+                  onAskAbout={(query) => { setSelectedCitation(null); handleDeepDive(query); }}
                 />
               </motion.div>
             </>
@@ -367,18 +370,22 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 function CitationPanelContent({
   citation,
   onClose,
+  onAskAbout,
 }: {
   citation: Citation;
   onClose: () => void;
+  onAskAbout: (query: string) => void;
 }) {
   const [enriched, setEnriched] = useState<EnrichedCitation | null>(null);
   const [enrichLoading, setEnrichLoading] = useState(false);
   const [showEn, setShowEn] = useState<Record<number, boolean>>({});
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   useEffect(() => {
     if (!citation.arxivId) return;
     setEnriched(null);
     setShowEn({});
+    setSummaryOpen(false);
     setEnrichLoading(true);
 
     const snippets = (citation.chunkContents ?? [])
@@ -400,6 +407,9 @@ function CitationPanelContent({
     ? enriched.translatedSnippets
     : (citation.chunkContents ?? []).map(c => ({ en: c.content ?? '', ja: '' }));
 
+  // "この論文についてグリモワールに聞く" で使うタイトル（日本語優先）
+  const askTitle = enriched?.titleJa || citation.title || '';
+
   return (
     <>
       {/* Header */}
@@ -416,15 +426,36 @@ function CitationPanelContent({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
-        {/* Title + Meta */}
-        <div className="space-y-1.5">
-          <p className="text-purple-100 text-sm font-semibold leading-snug">
-            {citation.title ?? 'Untitled Document'}
-          </p>
+        {/* Title block */}
+        <div className="space-y-1">
+          {/* 日本語タイトル（メイン） */}
+          {enrichLoading && !enriched ? (
+            <div className="flex items-center gap-2">
+              <Loader2 size={11} className="animate-spin text-purple-400/50 flex-shrink-0" />
+              <p className="text-purple-400/40 text-xs">論文情報を取得中...</p>
+            </div>
+          ) : (
+            <>
+              {enriched?.titleJa && (
+                <p className="text-purple-100 text-sm font-semibold leading-snug">
+                  {enriched.titleJa}
+                </p>
+              )}
+              {/* 英語タイトル（サブ） */}
+              <p className={enriched?.titleJa
+                ? 'text-purple-400/50 text-xs leading-snug'
+                : 'text-purple-100 text-sm font-semibold leading-snug'
+              }>
+                {citation.title ?? 'Untitled Document'}
+              </p>
+            </>
+          )}
+
+          {/* Meta: 著者・年・カテゴリ */}
           {enriched && (
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-purple-400/60 text-xs">
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-purple-400/55 text-xs mt-1">
               {enriched.authors.length > 0 && (
                 <span>{enriched.authors.slice(0, 3).join(', ')}{enriched.authors.length > 3 ? ' et al.' : ''}</span>
               )}
@@ -438,43 +469,38 @@ function CitationPanelContent({
           )}
         </div>
 
-        {/* Japanese Summary */}
-        {enrichLoading && !enriched && (
-          <div className="bg-purple-950/30 border border-purple-500/10 rounded-lg p-3 flex items-center gap-2">
-            <Loader2 size={12} className="animate-spin text-purple-400/60 flex-shrink-0" />
-            <p className="text-purple-400/40 text-xs">日本語要約を取得中...</p>
-          </div>
-        )}
-        {enriched?.summaryJa && (
-          <div className="space-y-1.5">
-            <p className="text-purple-400/60 text-xs">概要（日本語）</p>
-            <div className="bg-purple-950/40 border border-purple-500/15 rounded-lg p-3">
-              <p className="text-purple-100/85 text-xs leading-relaxed">
-                {enriched.summaryJa}
-              </p>
-            </div>
-          </div>
+        {/* CTA: この論文についてグリモワールに聞く */}
+        {askTitle && (
+          <button
+            onClick={() => onAskAbout(askTitle)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+              bg-purple-700/30 border border-purple-500/40
+              text-purple-200 text-xs font-medium
+              hover:bg-purple-600/40 hover:border-purple-400/60 hover:text-white
+              transition-all active:scale-[0.98]"
+          >
+            <BookOpen size={13} className="flex-shrink-0" />
+            <span>この論文についてグリモワールに聞く</span>
+          </button>
         )}
 
-        {/* Snippets */}
+        {/* 引用箇所（最重要：なぜ引用されたか） */}
         {snippetsToShow.length > 0 && (
-          <div className="space-y-2.5">
-            <p className="text-purple-400/60 text-xs">引用箇所</p>
+          <div className="space-y-2">
+            <p className="text-purple-400/60 text-xs">📌 回答で引用された箇所</p>
             {snippetsToShow.map((s, i) => (
-              <div key={i} className="bg-purple-950/30 border border-purple-500/10 rounded-lg p-3 space-y-2">
-                {/* 日本語（翻訳済みなら表示） */}
+              <div key={i} className="bg-purple-950/40 border border-purple-500/15 rounded-xl p-3 space-y-2">
                 {s.ja && s.ja !== s.en ? (
                   <>
-                    <p className="text-purple-100/85 text-xs leading-relaxed">{s.ja}</p>
-                    {/* 英語原文トグル */}
+                    <p className="text-purple-100/90 text-xs leading-relaxed">{s.ja}</p>
                     <button
                       onClick={() => setShowEn(prev => ({ ...prev, [i]: !prev[i] }))}
                       className="text-purple-500/50 hover:text-purple-400/70 text-xs transition-colors"
                     >
-                      {showEn[i] ? '原文を隠す' : '英語原文を表示'}
+                      {showEn[i] ? '原文を隠す ▲' : '英語原文を表示 ▼'}
                     </button>
                     {showEn[i] && (
-                      <p className="text-purple-400/50 text-xs leading-relaxed border-t border-purple-500/10 pt-2">
+                      <p className="text-purple-400/50 text-xs leading-relaxed border-t border-purple-500/10 pt-2 italic">
                         {s.en}
                       </p>
                     )}
@@ -487,49 +513,66 @@ function CitationPanelContent({
           </div>
         )}
 
-        {/* Links */}
+        {/* 概要（折りたたみ） */}
+        {enriched?.summaryJa && (
+          <div className="space-y-1.5">
+            <button
+              onClick={() => setSummaryOpen(o => !o)}
+              className="flex items-center gap-1.5 text-purple-400/60 text-xs hover:text-purple-300/80 transition-colors w-full text-left"
+            >
+              <span>{summaryOpen ? '▲' : '▼'}</span>
+              <span>論文の概要（日本語）</span>
+            </button>
+            {summaryOpen && (
+              <div className="bg-purple-950/30 border border-purple-500/10 rounded-xl p-3">
+                <p className="text-purple-100/80 text-xs leading-relaxed">
+                  {enriched.summaryJa}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 論文リンク（サブ扱い・横並び） */}
         {enriched?.links && (
-          <div className="space-y-2">
-            <p className="text-purple-400/60 text-xs">論文リンク</p>
-            <div className="flex flex-col gap-1.5">
+          <div className="space-y-1.5">
+            <p className="text-purple-400/50 text-xs">論文を読む</p>
+            <div className="flex gap-2">
               <a
                 href={enriched.links.abstract}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
                   bg-purple-900/20 border border-purple-500/20
-                  text-purple-200/80 hover:text-purple-100 hover:border-purple-400/40
+                  text-purple-300/70 hover:text-purple-100 hover:border-purple-400/40
                   text-xs transition-colors"
               >
-                <BookOpen size={12} className="flex-shrink-0 text-purple-400" />
-                <span>Abstract（arXiv）</span>
-                <ExternalLink size={10} className="ml-auto flex-shrink-0 text-purple-400/40" />
+                <BookOpen size={11} />
+                <span>Abstract</span>
               </a>
               <a
                 href={enriched.links.html}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
                   bg-purple-900/20 border border-purple-500/20
-                  text-purple-200/80 hover:text-purple-100 hover:border-purple-400/40
+                  text-purple-300/70 hover:text-purple-100 hover:border-purple-400/40
                   text-xs transition-colors"
               >
-                <Globe size={12} className="flex-shrink-0 text-purple-400" />
-                <span>HTML 版（図表あり）</span>
-                <ExternalLink size={10} className="ml-auto flex-shrink-0 text-purple-400/40" />
+                <Globe size={11} />
+                <span>HTML</span>
               </a>
               <a
                 href={enriched.links.pdf}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
                   bg-purple-900/20 border border-purple-500/20
-                  text-purple-200/80 hover:text-purple-100 hover:border-purple-400/40
+                  text-purple-300/70 hover:text-purple-100 hover:border-purple-400/40
                   text-xs transition-colors"
               >
-                <FileText size={12} className="flex-shrink-0 text-purple-400" />
+                <FileText size={11} />
                 <span>PDF</span>
-                <ExternalLink size={10} className="ml-auto flex-shrink-0 text-purple-400/40" />
               </a>
             </div>
           </div>
