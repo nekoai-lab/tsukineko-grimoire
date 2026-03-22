@@ -532,7 +532,7 @@ function CitationPanelContent({
             <div className="space-y-1.5">
               {/* サムネイル（クリックで拡大） */}
               <div
-                className="relative bg-black/30 rounded-xl overflow-hidden border border-purple-500/10
+                className="relative bg-white rounded-xl overflow-hidden border border-purple-500/10
                   cursor-zoom-in group"
                 style={{ minHeight: '100px' }}
                 onClick={() => setLightboxOpen(true)}
@@ -608,7 +608,7 @@ function CitationPanelContent({
                         <img
                           src={fig.url}
                           alt={fig.captionJa || fig.caption}
-                          className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-2xl"
+                          className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-2xl bg-white p-2"
                         />
 
                         {/* キャプション */}
