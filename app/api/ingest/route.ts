@@ -184,7 +184,7 @@ export async function POST(req: Request) {
     const parsedTags = manualTags
       ? manualTags.split(',').map(t => t.trim()).filter(Boolean)
       : [];
-    const mergedTags = [...new Set([...parsedTags, ...(meta.tags ?? [])])].filter(Boolean);
+    const mergedTags = Array.from(new Set([...parsedTags, ...(meta.tags ?? [])])).filter(Boolean);
 
     // 6. Firestore にメタデータを保存
     const db = getAdminFirestore();
