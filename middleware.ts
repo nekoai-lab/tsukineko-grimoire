@@ -32,7 +32,9 @@ export async function middleware(request: NextRequest) {
   // Cookie の存在確認のみ (firebase-admin は Edge Runtime 非対応のため使用禁止)
   // 実際のトークン検証は各 API Route で verifyAndGetUser() を使って行う
   if (!session?.value) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    // 307 だと元リクエストのメソッドが維持され POST /login になり 405 になる。
+    // 303 で Location を GET で取得させ、ログイン画面表示に限定する。
+    return NextResponse.redirect(new URL("/login", request.url), 303);
   }
 
   // セッショントークンを後段の API Route に渡す
