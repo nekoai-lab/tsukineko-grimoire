@@ -221,9 +221,9 @@ export async function POST(req: Request) {
 
         const { category, tags } = parseArxivCategories(entry.category);
 
-        // 6. 日本語翻訳（失敗しても続行）
+        // 6. 日本語翻訳（失敗しても続行）。title と summary が同一なら 1 回の翻訳を両方に使う
         const summaryJa = await translateToJapanese(summary);
-        const titleJa = await translateToJapanese(title);
+        const titleJa = title === summary ? summaryJa : await translateToJapanese(title);
 
         // 7. HTML 優先で Markdown 変換して GCS に保存（失敗時は PDF フォールバック）
         const mdFilename = filename.replace(/\.pdf$/, '.md');
@@ -347,8 +347,9 @@ async function handleSingleById(
 
     const { category, tags } = parseArxivCategories(entry.category);
 
-    // 日本語翻訳
+    // 日本語翻訳。title と summary が同一なら 1 回の翻訳を両方に使う
     const summaryJa = await translateToJapanese(summary);
+    const titleJa = title === summary ? summaryJa : await translateToJapanese(title);
 
     // PDF ダウンロード
     const pdfUrl = `https://arxiv.org/pdf/${cleanId}.pdf`;
@@ -404,7 +405,7 @@ async function handleSingleById(
       status: 'pending',
       uploadedAt: FieldValue.serverTimestamp(),
       title,
-      titleJa: await translateToJapanese(title),
+      titleJa,
       summary,
       summaryJa,
       authors,
