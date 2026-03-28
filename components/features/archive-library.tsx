@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, BookOpen, Users, Calendar, CheckCircle, XCircle, Clock, ExternalLink, ChevronRight } from 'lucide-react';
 import { getClientDb } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { formatBytes } from '@/lib/utils';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -125,7 +125,8 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
     const q = query(
       collection(db, 'documents'),
       where('userId', 'in', [userId ?? '__guest__', 'system']),
-      limit(200)
+      orderBy('uploadedAt', 'desc'),
+      limit(500)
     );
 
     const unsubscribe = onSnapshot(q, snapshot => {
@@ -149,13 +150,6 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
           theme: d.theme ?? '',
           metadata: d.metadata ?? {},
         };
-      });
-
-      // Firestore の orderBy は複合インデックスが必要なため JS 側でソート
-      items.sort((a, b) => {
-        if (!a.uploadedAt) return 1;
-        if (!b.uploadedAt) return -1;
-        return b.uploadedAt.localeCompare(a.uploadedAt);
       });
 
       setDocs(items);
