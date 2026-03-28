@@ -1,4 +1,6 @@
+import { randomUUID } from 'crypto';
 import { getAdminFirestore, FieldValue, getAdminAuth } from '@/lib/firebase-admin';
+import { isValidGrimoireGuestChatId } from '@/lib/grimoire-chat-constants';
 import { getCachedAnswer, cacheAnswer } from '@/lib/query-cache';
 import { getSearchClient, buildServingConfigPath } from '@/lib/vertex-discovery';
 import { translateToEnglish } from '@/lib/translate';
@@ -24,6 +26,8 @@ export async function POST(req: Request) {
     history?: Array<{ role: 'user' | 'assistant'; content: string }>;
     chatId?: string;
   };
+
+  const clientChatId = typeof chatId === 'string' ? chatId.trim() : '';
 
   if (!question?.trim()) {
     return Response.json({ error: '呪文の詠唱に失敗しました: 質問が空です' }, { status: 400 });
@@ -399,10 +403,18 @@ Write in precise, academic Japanese suitable for a researcher.`,
     const result = { answer, citations };
 
     // 6. Firestore に会話を保存（失敗しても回答は返す）
-    if (chatId) {
+    /** (1) 検証済み uid (2) 妥当な guestId (3) リクエスト単位の guest uuid */
+    const chatsDocId: string =
+      userId !== 'guest'
+        ? userId
+        : isValidGrimoireGuestChatId(clientChatId)
+          ? clientChatId
+          : `guest_${randomUUID()}`;
+
+    if (chatsDocId) {
       try {
         const db = getAdminFirestore();
-        await db.collection('chats').doc(chatId).set(
+        await db.collection('chats').doc(chatsDocId).set(
           {
             userId,
             messages: FieldValue.arrayUnion(

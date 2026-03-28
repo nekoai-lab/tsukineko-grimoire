@@ -9,6 +9,10 @@ import remarkGfm from 'remark-gfm';
 import { MessageBubble } from './message-bubble';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getClientAuth } from '@/lib/firebase';
+import {
+  GRIMOIRE_GUEST_CHAT_STORAGE_KEY,
+  isValidGrimoireGuestChatId,
+} from '@/lib/grimoire-chat-constants';
 
 /** Agent Builder が返すスニペットに含まれる HTML タグを除去 */
 function stripHtml(text: string): string {
@@ -98,20 +102,22 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  chatId: string;
   initialArxivId?: string;
 }
 
 const PANEL_MIN = 240;
 const PANEL_DEFAULT = 320;
 
-export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
+export function ChatInterface({ initialArxivId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT);
   const [userId, setUserId] = useState<string | null>(null);
+  /** undefined = 認証初回コールバック前 / null = ゲスト / string = Firebase uid */
+  const [firebaseUid, setFirebaseUid] = useState<string | null | undefined>(undefined);
+  const [guestChatId, setGuestChatId] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isMobile = useIsMobile();
@@ -121,10 +127,36 @@ export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(getClientAuth(), user => {
-      setUserId(user?.uid ?? null);
+      const uid = user?.uid ?? null;
+      setUserId(uid);
+      setFirebaseUid(uid);
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (firebaseUid === undefined || firebaseUid !== null) return;
+    try {
+      let id = localStorage.getItem(GRIMOIRE_GUEST_CHAT_STORAGE_KEY);
+      if (!id || !isValidGrimoireGuestChatId(id)) {
+        id = `guest_${crypto.randomUUID()}`;
+        localStorage.setItem(GRIMOIRE_GUEST_CHAT_STORAGE_KEY, id);
+      }
+      setGuestChatId(id);
+    } catch {
+      setGuestChatId(`guest_${crypto.randomUUID()}`);
+    }
+  }, [firebaseUid]);
+
+  const chatStorageReady =
+    firebaseUid !== undefined && (firebaseUid !== null || guestChatId.length > 0);
+
+  const chatStorageId =
+    firebaseUid === undefined
+      ? ''
+      : firebaseUid !== null
+        ? firebaseUid
+        : guestChatId;
 
   useEffect(() => {
     if (initialArxivId) {
@@ -169,6 +201,10 @@ export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
   const handleSubmit = useCallback(async () => {
     const question = input.trim();
     if (!question || loading) return;
+    if (!chatStorageReady) {
+      toast.error('接続準備中です。少し待ってからお試しください');
+      return;
+    }
 
     setInput('');
     setLoading(true);
@@ -182,7 +218,7 @@ export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, history: historySnapshot, chatId }),
+        body: JSON.stringify({ question, history: historySnapshot, chatId: chatStorageId }),
       });
 
       const data = await res.json();
@@ -212,12 +248,16 @@ export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
       setLoading(false);
       textareaRef.current?.focus();
     }
-  }, [input, loading, messages, chatId]);
+  }, [input, loading, messages, chatStorageId, chatStorageReady]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // IME変換中（isComposing）はEnterを無視して送信しない
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
+      if (!chatStorageReady) {
+        toast.error('接続準備中です。少し待ってからお試しください');
+        return;
+      }
       handleSubmit();
     }
   };
@@ -226,6 +266,10 @@ export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
   // displayMessage: チャットに表示する日本語文
   // searchQuery: Agent Builder に投げる検索キーワード（選択テキストそのもの）
   const handleDeepDive = useCallback((selectedText: string) => {
+    if (!chatStorageReady) {
+      toast.error('接続準備中です。少し待ってからお試しください');
+      return;
+    }
     const displayMessage = `「${selectedText}」についてもっと詳しく教えてください`;
     const searchQuery = selectedText; // 自然文ではなくキーワードのみを検索に使う
 
@@ -236,7 +280,7 @@ export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
     fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: searchQuery, history: historySnapshot, chatId }),
+      body: JSON.stringify({ question: searchQuery, history: historySnapshot, chatId: chatStorageId }),
     })
       .then(r => r.json())
       .then(data => {
@@ -252,7 +296,7 @@ export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
         setLoading(false);
         textareaRef.current?.focus();
       });
-  }, [messages, chatId]);
+  }, [messages, chatStorageId, chatStorageReady]);
 
   return (
     <div className="flex h-full">
@@ -407,9 +451,10 @@ export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
           />
           <button
             onClick={handleSubmit}
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || !chatStorageReady}
             className="glow-button p-2.5 flex-shrink-0"
             aria-label="送信"
+            title={!chatStorageReady ? '接続準備中です' : undefined}
           >
             {loading ? (
               <Loader2 size={18} className="animate-spin" />
@@ -418,6 +463,9 @@ export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
             )}
           </button>
         </div>
+        {!chatStorageReady && (
+          <p className="text-purple-300/45 text-xs mt-2">接続準備中…</p>
+        )}
       </div>
       </div>{/* end Left */}
 

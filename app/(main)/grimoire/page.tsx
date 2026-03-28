@@ -3,9 +3,6 @@ import { ParticleBackground } from '@/components/magic-ui/particle-bg';
 
 export const dynamic = 'force-dynamic';
 
-// チャットIDは簡易的にセッションベースで生成（実装後はユーザーごとに管理）
-const DEFAULT_CHAT_ID = 'default';
-
 /** Next.js 14 では searchParams は同期オブジェクト（15 以降の Promise パターンは使わない） */
 function pickArxivId(
   raw: string | string[] | undefined
@@ -29,7 +26,7 @@ export default function GrimoirePage({
     <div className="h-[calc(100dvh-52px)] relative">
       <ParticleBackground />
       <div className="relative z-10 h-full flex flex-col">
-        <ChatInterface chatId={DEFAULT_CHAT_ID} initialArxivId={initialArxivId} />
+        <ChatInterface initialArxivId={initialArxivId} />
       </div>
     </div>
   );
