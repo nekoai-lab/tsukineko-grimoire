@@ -18,6 +18,12 @@
  */
 
 import * as cheerio from 'cheerio';
+import { getAdminFirestore } from '@/lib/firebase-admin';
+import {
+  getCachedPaperFigureCaption,
+  savePaperFigureCaptionTranslation,
+} from '@/lib/paper-figure-caption-cache';
+import { normalizeSnippetSourceText, SNIPPET_TARGET_LANG_JA } from '@/lib/translation-snippet-cache';
 import { translateToJapanese } from '@/lib/translate';
 
 // キャッシュを無効化（古いURLがキャッシュされて図が壊れる問題を防ぐ）
@@ -249,15 +255,64 @@ export async function GET(req: Request) {
       .slice(0, 2)
       .map(c => c.table);
 
-    // ── 翻訳（並列） ─────────────────────────────────────────────────
+    // ── 翻訳（並列・Firestore キャッシュ） ───────────────────────────
+    const db = getAdminFirestore();
     await Promise.all([
       ...selectedFigs.map(async fig => {
         if (!fig.caption) return;
-        try { fig.captionJa = await translateToJapanese(fig.caption); } catch { /* 無視 */ }
+        try {
+          const normalized = normalizeSnippetSourceText(fig.caption);
+          if (!normalized) return;
+          const cached = await getCachedPaperFigureCaption(
+            db,
+            arxivId,
+            fig.caption,
+            SNIPPET_TARGET_LANG_JA
+          );
+          if (cached !== null) {
+            fig.captionJa = cached;
+            return;
+          }
+          const ja = await translateToJapanese(normalized);
+          fig.captionJa = ja;
+          if (ja) {
+            await savePaperFigureCaptionTranslation(
+              db,
+              arxivId,
+              fig.caption,
+              SNIPPET_TARGET_LANG_JA,
+              ja
+            );
+          }
+        } catch { /* 無視 */ }
       }),
       ...selectedTables.map(async tbl => {
         if (!tbl.caption) return;
-        try { tbl.captionJa = await translateToJapanese(tbl.caption); } catch { /* 無視 */ }
+        try {
+          const normalized = normalizeSnippetSourceText(tbl.caption);
+          if (!normalized) return;
+          const cached = await getCachedPaperFigureCaption(
+            db,
+            arxivId,
+            tbl.caption,
+            SNIPPET_TARGET_LANG_JA
+          );
+          if (cached !== null) {
+            tbl.captionJa = cached;
+            return;
+          }
+          const ja = await translateToJapanese(normalized);
+          tbl.captionJa = ja;
+          if (ja) {
+            await savePaperFigureCaptionTranslation(
+              db,
+              arxivId,
+              tbl.caption,
+              SNIPPET_TARGET_LANG_JA,
+              ja
+            );
+          }
+        } catch { /* 無視 */ }
       }),
     ]);
 
