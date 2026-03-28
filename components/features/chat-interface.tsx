@@ -160,12 +160,8 @@ export function ChatInterface({ initialArxivId }: ChatInterfaceProps) {
 
   useEffect(() => {
     if (initialArxivId) {
-      // initialArxivId がある場合、自動的に CitationPanel を開く
-      // title はまだ分からないのでダミーを入れる（CitationPanel 側で api/citation から正確な最新タイトルを取得する）
-      setSelectedCitation({
-        arxivId: initialArxivId,
-        title: 'Loading document info...',
-      });
+      // initialArxivId がある場合、自動的に CitationPanel を開く（タイトルは CitationPanel 側で取得）
+      setSelectedCitation({ arxivId: initialArxivId });
     }
   }, [initialArxivId]);
 
@@ -767,6 +763,9 @@ function ResultTableCard({ table }: { table: ResultTable }) {
   );
 }
 
+/** 旧初期表示用ダミー。表示ロジックからは除外する（互換のため値は据え置き） */
+const CITATION_TITLE_PLACEHOLDER = 'Loading document info...';
+
 function CitationPanelContent({
   citation,
   userId,
@@ -837,8 +836,27 @@ function CitationPanelContent({
     ? enriched.translatedSnippets
     : (citation.chunkContents ?? []).map(c => ({ en: c.content ?? '', ja: '' }));
 
+  const isPlaceholderTitle = citation.title === CITATION_TITLE_PLACEHOLDER;
+  const hasRealCitationTitle = Boolean(citation.title?.trim()) && !isPlaceholderTitle;
+
+  const primaryTitleFallback = (): string => {
+    if (isPlaceholderTitle) {
+      if (citation.arxivId) return `arXiv:${citation.arxivId}`;
+      return 'タイトル未取得';
+    }
+    const t = citation.title?.trim();
+    if (t) return t;
+    if (citation.arxivId) return `arXiv:${citation.arxivId}`;
+    return 'Untitled Document';
+  };
+
+  const showEnglishSubtitle = Boolean(enriched?.titleJa) && hasRealCitationTitle;
+
   // "この論文についてグリモワールに聞く" で使うタイトル（日本語優先）
-  const askTitle = enriched?.titleJa || citation.title || '';
+  const askTitle =
+    enriched?.titleJa ||
+    (hasRealCitationTitle ? (citation.title ?? '').trim() : '') ||
+    (citation.arxivId ? `arXiv:${citation.arxivId}` : '');
 
   // 本棚に追加・削除
   const handleShelf = async () => {
@@ -920,12 +938,16 @@ function CitationPanelContent({
                   {enriched.titleJa}
                 </p>
               )}
-              <p className={enriched?.titleJa
-                ? 'text-purple-300/60 text-xs leading-snug'
-                : 'text-purple-100 text-sm font-semibold leading-snug'
-              }>
-                {citation.title ?? 'Untitled Document'}
-              </p>
+              {showEnglishSubtitle && (
+                <p className="text-purple-300/60 text-xs leading-snug">
+                  {citation.title}
+                </p>
+              )}
+              {!enriched?.titleJa && (
+                <p className="text-purple-100 text-sm font-semibold leading-snug">
+                  {primaryTitleFallback()}
+                </p>
+              )}
             </>
           )}
           {enriched && (
