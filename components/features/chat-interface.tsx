@@ -99,12 +99,13 @@ interface Message {
 
 interface ChatInterfaceProps {
   chatId: string;
+  initialArxivId?: string;
 }
 
 const PANEL_MIN = 240;
 const PANEL_DEFAULT = 320;
 
-export function ChatInterface({ chatId }: ChatInterfaceProps) {
+export function ChatInterface({ chatId, initialArxivId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -124,6 +125,17 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (initialArxivId) {
+      // initialArxivId がある場合、自動的に CitationPanel を開く
+      // title はまだ分からないのでダミーを入れる（CitationPanel 側で api/citation から正確な最新タイトルを取得する）
+      setSelectedCitation({
+        arxivId: initialArxivId,
+        title: 'Loading document info...',
+      });
+    }
+  }, [initialArxivId]);
 
   const onResizeStart = useCallback((e: React.MouseEvent) => {
     isDragging.current = true;

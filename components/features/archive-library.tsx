@@ -751,6 +751,16 @@ function DocCard({
           <div className="flex flex-wrap items-center gap-2 pt-0.5" onClick={e => e.stopPropagation()}>
             {doc.arxivId && (
               <a
+                href={`/grimoire?arxivId=${doc.arxivId}`}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-600/20 text-xs text-purple-200/90
+                  shadow-[0_0_10px_rgba(168,85,247,0.15)] border border-purple-500/30
+                  hover:bg-purple-500/30 hover:shadow-[0_0_15px_rgba(168,85,247,0.25)] transition-all"
+              >
+                <span>🔮</span> Consultで開く
+              </a>
+            )}
+            {doc.arxivId && (
+              <a
                 href={`https://arxiv.org/html/${doc.arxivId}`}
                 target="_blank"
                 rel="noopener noreferrer"

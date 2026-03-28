@@ -119,7 +119,7 @@ function filterShelfItems(
     }
     if (q) {
       const haystack = [
-        item.title, item.titleJa, item.authors.join(' '),
+        item.title, item.titleJa, item.authors.join(' '), item.arxivId,
       ].join(' ').toLowerCase();
       if (!haystack.includes(q)) return false;
     }
