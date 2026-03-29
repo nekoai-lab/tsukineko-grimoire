@@ -1,102 +1,65 @@
-# Tsukineko Grimoire - Cursor Development Rules
+# Tsukineko Grimoire — Cursor Rules
 
-このプロジェクトは Google Cloud "Trial credit for GenAI App Builder" クーポンを消費することが
-最優先目的です。以下のルールを **絶対に** 遵守してください。
+このファイルは AI がコードを書くときの実務判断基準です。
+設計方針は `PRD.md`、プロダクト概要は `README.md` を参照してください。
 
 ---
 
-## 🚨 CRITICAL: クーポン制約（最重要）
+## Non-negotiable constraints
 
-### ✅ 許可されるライブラリ・API（これらのみ使用可能）
+### AI API は Discovery Engine 経由のみ
+
+AI 機能の実装には `@google-cloud/discoveryengine` を使う。
+`@google-cloud/vertexai` / `GenerativeModel` / `generateContent()` は追加しない。
+コスト面で予期しない課金を発生させないための制約。
 
 ```typescript
-// ✅ ALLOWED: Agent Builder のみ
+// ✅
 import { ConversationalSearchServiceClient } from '@google-cloud/discoveryengine';
-import { SearchServiceClient } from '@google-cloud/discoveryengine';
-import { DocumentServiceClient } from '@google-cloud/discoveryengine';
-```
 
-### ❌ 禁止されるライブラリ・API（絶対に使用禁止）
-
-```typescript
-// ❌ FORBIDDEN: 高額請求の原因になる
+// ❌ 追加禁止
 import { VertexAI } from '@google-cloud/vertexai';
-import { GenerativeModel } from '@google-cloud/vertexai';
-import * as aiplatform from '@google-cloud/aiplatform';
-
-// これらのメソッドも禁止
-model.generateContent()
-model.streamGenerateContent()
-model.countTokens()
 ```
 
-### 🔍 コード生成前の自己チェック
+### Agent Builder の Location と ID
 
-コードを生成・提案する前に確認:
-1. `@google-cloud/vertexai` を使っていないか？
-2. `GenerativeModel` クラスを使用していないか？
-3. すべての AI 機能が `@google-cloud/discoveryengine` 経由か？
-
-違反を発見した場合は即座に修正してください。
-
----
-
-## 📍 Vertex AI Agent Builder: Location 設定（必須）
-
-```
-Location:         global  ← 必ず global を使用
-API Endpoint:     discoveryengine.googleapis.com  ← regional prefix なし
-Engine ID:        短いIDのみ (例: my-engine_1234567890)
-Data Store ID:    短いIDのみ (例: my-datastore_1234567890)
-```
+- `VERTEX_AI_LOCATION` は `global` を使う
+- API endpoint は `discoveryengine.googleapis.com`（regional prefix なし）
+- Engine ID / Data Store ID は短い ID のみ。フルパス（`projects/.../engines/...`）を直書きしない
 
 ```typescript
-// ✅ CORRECT
+// ✅
 const location = process.env.VERTEX_AI_LOCATION!; // 'global'
 const apiEndpoint = location === 'global'
   ? 'discoveryengine.googleapis.com'
   : `${location}-discoveryengine.googleapis.com`;
-
-const client = new ConversationalSearchServiceClient({ apiEndpoint });
-
-const servingConfig = client.projectLocationCollectionEngineServingConfigPath(
-  process.env.GOOGLE_CLOUD_PROJECT_ID!,
-  location,                             // 'global'
-  'default_collection',
-  process.env.VERTEX_AI_ENGINE_ID!,     // 短いIDのみ
-  'default_config'
-);
-
-// ❌ WRONG
-const client = new ConversationalSearchServiceClient({
-  apiEndpoint: 'asia-northeast1-discoveryengine.googleapis.com', // NG
-});
 ```
 
 ---
 
-## 🔐 認証パターン（必須）
+## Authentication & runtime rules
 
-### middleware.ts: Cookie確認のみ（firebase-admin 禁止）
+### middleware.ts
+
+Edge Runtime で動くため firebase-admin は使えない。
+`session` Cookie の存在確認のみ行い、`x-session-token` を後段に渡す。
+未認証時は **303** で `/login` にリダイレクトする（307 は POST を引き継ぐため使わない）。
 
 ```typescript
-// ✅ CORRECT: Edge Runtime 対応
-// Cookieの存在確認のみ行い、x-session-token を後段に渡す
 if (!session?.value) {
-  return NextResponse.redirect(new URL('/login', request.url));
+  return NextResponse.redirect(new URL('/login', request.url), 303);
 }
 const requestHeaders = new Headers(request.headers);
 requestHeaders.set('x-session-token', session.value);
-
-// ❌ WRONG: Edge Runtime でクラッシュする
-const { auth } = await import('./lib/firebase-admin'); // 使用禁止
-await auth.verifySessionCookie(session.value, true);   // 使用禁止
+return NextResponse.next({ request: { headers: requestHeaders } });
 ```
 
-### API Routes: verifyAndGetUser() を必ず使用
+### API Routes
+
+認証が必要なエンドポイントは先頭で `verifyAndGetUser()` を呼ぶ。
+失敗時は即 401 を返す。認証を後回しにしない。
 
 ```typescript
-// ✅ CORRECT: 全 API Route の先頭でこのパターンを使う
 import { verifyAndGetUser } from '@/lib/auth-helpers';
 
 export async function POST(req: Request) {
@@ -107,87 +70,107 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  // ... rest of logic
+  // ...
 }
 ```
 
-### Firebase Admin: FieldValue は必ず import
+### Firebase Admin
+
+`FieldValue` は `@/lib/firebase-admin` から直接 import する。
+`admin.firestore.FieldValue` を経由しない（`admin` が undefined になる）。
 
 ```typescript
-// ✅ CORRECT
+// ✅
 import { firestore, FieldValue } from '@/lib/firebase-admin';
+uploadedAt: FieldValue.serverTimestamp()
 
-await firestore.collection('documents').add({
-  uploadedAt: FieldValue.serverTimestamp(), // ✅
-});
-
-// ❌ WRONG: admin が undefined になる
-import { firestore } from '@/lib/firebase-admin';
-uploadedAt: admin.firestore.FieldValue.serverTimestamp(), // ❌
+// ❌
+admin.firestore.FieldValue.serverTimestamp()
 ```
 
 ---
 
-## 📐 コーディング規約
+## Data & persistence rules
 
-### TypeScript
-- strict mode 必須
-- `any` 型の使用禁止（`unknown` を使用）
-- すべての関数に型定義
-- async/await には必ず try-catch
+### chats の保存単位
 
-### エラーハンドリング
-- エラーメッセージは魔法テーマで:
-  - UNAUTHENTICATED → "魔導書へのアクセスが拒否されました"
-  - NOT_FOUND → "その知識は魔導書に記録されていません"
-  - INVALID_ARGUMENT → "呪文の詠唱に失敗しました"
-  - RESOURCE_EXHAUSTED → "魔力が不足しています。しばらくお待ちください"
+- サインインユーザー: Firebase uid を chatId に使う
+- ゲストユーザー: `localStorage` の `tsukineko_grimoire_guest_chat_id` に保存した `guest_{uuid}` を使う
+- `chats/default` のような共有ドキュメントは作らない
+- uid でも guest id でもない共通キーへのフォールバックは禁止
 
-### ファイル命名規則
-- コンポーネント: PascalCase (`ChatInterface.tsx`)
-- ユーティリティ: kebab-case (`vertex-discovery.ts`)
-- API Routes: `route.ts` (Next.js App Router)
+### Firestore 書き込み
 
-### セキュリティ
-- `NEXT_PUBLIC_` のない環境変数は絶対にクライアントに渡さない
-- GCS Signed URL の有効期限は15分以内
-- セッション検証は必ず API Route 側で行う
+- `serverTimestamp()` には `FieldValue.serverTimestamp()` を使う
+- `FieldValue.arrayUnion()` / `FieldValue.increment()` も同様に import して使う
+- クライアント側の `Date.now()` で代用しない
+
+### Translation cache
+
+- snippet の翻訳前に `translation_snippet_cache` を確認する
+- figure / table caption の翻訳前に `translation_paper_figure_caption_cache` を確認する
+- キャッシュヒット時は Translate API を呼ばない
+- 保存時は原文ハッシュや正規化キーを一貫させ、毎回違うキーで重複保存しない
 
 ---
 
-## 🎨 UI/UX
+## UI / behavior rules
 
-### テーマ: Magic × Cyberpunk
-- Background: `#0a0a0a` (void black)
-- Primary: `#7c3aed` (mystic purple)
-- Accent: `#fbbf24` (gold)
-- Glow: `#a78bfa` (mana glow)
+### プレースホルダーをそのまま見せない
 
-### コンポーネントパターン
-```tsx
-// Glassmorphism
-<div className="bg-black/60 backdrop-blur-xl border border-purple-500/20 rounded-lg">
+取得前の仮文字列（例: `'Loading document info...'`）は、取得完了後に UI に残さない。
+`citation.title` がプレースホルダーかどうかを判定し、表示対象から外す。
+代替表示には `arXiv:${arxivId}` などの自然な fallback を使う。
 
-// Levitation
-<motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity }}>
+### 通常経路を壊さない
 
-// Glow Button
-<button className="hover:shadow-[0_0_20px_rgba(167,139,250,0.6)] transition-shadow duration-300">
-```
+Archive 経由など特定経路の不具合修正は、最小差分で行う。
+共通コンポーネントの条件分岐を広げて通常経路の見た目を変えない。
 
-### レスポンシブ
-- Mobile: チャット100%幅, Previewは非表示
-- Tablet+: `md:w-[60%]` / `md:w-[40%]`
+### データ不足と UI バグを切り分ける
 
----
+API レスポンスに値が入っているのに表示されない → UI バグ。
+API レスポンス自体が空 → データ層の問題。両者を混同して直しにいかない。
 
-## 🚀 デプロイ
-- Next.js: `output: 'standalone'` 必須
-- Cloud Run: ポート 8080、`Dockerfile` を使用
-- pnpm: `--frozen-lockfile` で依存関係をロック
+### Fallback の扱い
+
+`titleJa` → `title` → `arXiv:id` → `'Untitled Document'` の順で fallback する。
+前段が truthy なら後段は表示しない。fallback が意図より前に出ないよう条件を狭くする。
 
 ---
 
-## 📖 常に参照すること
-- `PRD.md` に全ての仕様が記載されています
-- 実装前に必ず PRD.md の該当セクションを確認してください
+## Coding standards
+
+- TypeScript strict mode。`any` は使わず `unknown` を使う
+- すべての関数に引数・返り値の型を付ける
+- async 関数には必ず try-catch
+- `NEXT_PUBLIC_` のない環境変数はクライアントに渡さない
+- GCS Signed URL の有効期限は 15 分以内
+- セッション検証は必ず API Route 側で行い、middleware だけに頼らない
+
+### ファイル命名
+
+- コンポーネント: PascalCase（`ChatInterface.tsx`）
+- ユーティリティ: kebab-case（`translate.ts`）
+- API Route: `route.ts`（App Router 規約）
+
+---
+
+## Deployment notes
+
+- Next.js: `output: 'standalone'` 必須（Cloud Run 用）
+- ポート: 8080
+- `npm run build` を通してからコミットする
+- 秘密情報は Secret Manager で管理し、ローカルは `.env.local`
+
+---
+
+## Reference docs
+
+| ファイル | 参照目的 |
+|--------|--------|
+| `README.md` | プロダクト概要・ユーザー向け説明 |
+| `PRD.md` | 設計方針・スコープ・API 一覧・データモデル |
+| `.cursorrules`（このファイル） | AI コーディング時の実務ルール |
+
+実装前に `PRD.md` の該当節を確認する。設計と矛盾する実装は最小差分で修正する。
