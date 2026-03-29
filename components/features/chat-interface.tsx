@@ -842,7 +842,7 @@ function CitationPanelContent({
   const askTitle =
     enriched?.titleJa ||
     (isPlaceholderTitle ? '' : (citation.title ?? '')) ||
-    (citation.arxivId ? `arXiv:${citation.arxivId}` : '');
+    '';
 
   // 本棚に追加・削除
   const handleShelf = async () => {
@@ -920,24 +920,18 @@ function CitationPanelContent({
           ) : (
             <>
               {enriched?.titleJa && (
-                <>
-                  <p className="text-purple-100 text-sm font-semibold leading-snug">
-                    {enriched.titleJa}
-                  </p>
-                  {!isPlaceholderTitle && (
-                    <p className="text-purple-300/60 text-xs leading-snug">
-                      {citation.title ?? 'Untitled Document'}
-                    </p>
-                  )}
-                </>
-              )}
-              {!enriched?.titleJa && (
                 <p className="text-purple-100 text-sm font-semibold leading-snug">
-                  {isPlaceholderTitle
-                    ? (citation.arxivId ? `arXiv:${citation.arxivId}` : 'タイトル未取得')
-                    : (citation.title ?? 'Untitled Document')}
+                  {enriched.titleJa}
                 </p>
               )}
+              <p className={enriched?.titleJa
+                ? 'text-purple-300/60 text-xs leading-snug'
+                : 'text-purple-100 text-sm font-semibold leading-snug'
+              }>
+                {isPlaceholderTitle
+                  ? (citation.arxivId ? `arXiv:${citation.arxivId}` : 'タイトル未取得')
+                  : (citation.title ?? 'Untitled Document')}
+              </p>
             </>
           )}
           {enriched && (
