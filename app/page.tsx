@@ -3,26 +3,20 @@ import { ParticleBackground } from '@/components/magic-ui/particle-bg';
 
 const FEATURES = [
   {
-    icon: '🔍',
+    symbol: '◎',
     label: '論文を見つける',
-    desc: 'AI・機械学習論文をキーワードや自然文で検索できます',
+    desc: 'キーワードや自然文でAI・機械学習論文を検索',
   },
   {
-    icon: '📚',
+    symbol: '⬡',
     label: '論文をためる',
-    desc: '気になった論文をマイ本棚に保存して読書リストを育てられます',
+    desc: '気になった論文をマイ本棚に保存',
   },
   {
-    icon: '💬',
+    symbol: '✦',
     label: 'あとで聞き返す',
-    desc: '保存した論文にチャットで質問して、引用付きで答えが返ります',
+    desc: '保存した論文にチャットで質問、引用付きで回答',
   },
-];
-
-const PAINS = [
-  { pain: '保存しても埋もれる', value: '本棚に整理してあとから探せる' },
-  { pain: '読んだ内容を思い出せない', value: 'チャットで聞き直せる' },
-  { pain: '図表や引用まで戻りたい', value: '代表図・結果表・原文リンクをすぐ確認できる' },
 ];
 
 export default function LandingPage() {
@@ -110,57 +104,35 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 3つの体験カード ── */}
-      <section className="relative z-10 px-6 pb-16 max-w-4xl mx-auto w-full">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* ── 3列仕切りパネル ── */}
+      <section className="relative z-10 px-6 pb-10 max-w-3xl mx-auto w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x
+          divide-purple-500/10 border border-purple-500/10 rounded-2xl overflow-hidden">
           {FEATURES.map(f => (
-            <div
-              key={f.label}
-              className="bg-black/60 backdrop-blur-xl border border-purple-500/20
-                rounded-2xl px-5 py-6 text-center"
-            >
-              <div className="text-3xl mb-3">{f.icon}</div>
-              <p className="text-purple-100 font-semibold text-sm mb-2">{f.label}</p>
-              <p className="text-purple-300/50 text-xs leading-relaxed">{f.desc}</p>
+            <div key={f.label} className="px-6 py-5 text-center bg-purple-950/10">
+              <p className="text-purple-400/40 text-[11px] tracking-widest mb-2 font-mono">
+                {f.symbol}
+              </p>
+              <p className="text-purple-100 text-xs font-semibold mb-1">{f.label}</p>
+              <p className="text-purple-400/50 text-[11px] leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── 共感 / 価値ブロック ── */}
-      <section className="relative z-10 px-6 pb-16 max-w-3xl mx-auto w-full">
-        <p className="text-center text-purple-300/50 text-xs tracking-widest mb-6 uppercase">
-          こんな経験はありませんか
-        </p>
-        <div className="space-y-3">
-          {PAINS.map(({ pain, value }) => (
-            <div
-              key={pain}
-              className="flex flex-col sm:flex-row items-start sm:items-center gap-3
-                bg-purple-950/30 border border-purple-500/10 rounded-xl px-5 py-4"
-            >
-              <span className="text-purple-400/60 text-xs flex-shrink-0 sm:w-44 leading-snug">
-                ❌ &nbsp;{pain}
-              </span>
-              <span className="text-purple-400/30 hidden sm:block">→</span>
-              <span className="text-purple-100/80 text-xs leading-snug">
-                ✅ &nbsp;{value}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── 注意書き ── */}
-      <section className="relative z-10 px-6 pb-8 max-w-3xl mx-auto w-full text-center">
-        <p className="text-purple-400/40 text-[10px] leading-relaxed">
-          現在公開中のプロトタイプです。回答の精度・日本語の自然さは継続改善中です。
-          フィードバックは随時歓迎しています。
+      {/* ── 価値コピー ── */}
+      <section className="relative z-10 px-6 pb-10 max-w-2xl mx-auto w-full text-center">
+        <p className="text-purple-300/40 text-xs leading-loose">
+          読んで終わりにしない。保存して、あとから引用ごと聞き直せる。<br />
+          図表も原文も、ぜんぶ手元に残る知識書庫。
         </p>
       </section>
 
-      {/* ── 技術フッター ── */}
-      <footer className="relative z-10 pb-8 text-center">
+      {/* ── フッター ── */}
+      <footer className="relative z-10 pb-8 text-center space-y-1">
+        <p className="text-purple-400/30 text-[10px] leading-relaxed">
+          現在公開中のプロトタイプです。回答精度・日本語の自然さは継続改善中。
+        </p>
         <p className="text-purple-500/20 text-[10px]">
           Cloud Run · Firebase · Vertex AI Agent Builder
         </p>
