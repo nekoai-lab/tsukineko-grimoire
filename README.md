@@ -117,3 +117,14 @@ WATCHPACK_POLLING=true npm run dev -- --port 3002
 - 日本語タイトル（`titleJa`）があれば優先表示し、英題はサブタイトルとして出す
 - `titleJa` 未取得の場合は英題、それもない場合は arXiv ID をフォールバックにする
 - `Loading document info...` のようなプレースホルダー文字列はパネルに表示しない
+
+---
+
+## License / Usage
+
+© 2024–2026 tsuki (nekoai-lab). All rights reserved.
+
+This repository is shared for viewing, evaluation, and feedback — not for redistribution or commercial use.
+For any other use, please [get in touch](https://github.com/nekoai-lab).
+
+See [`LICENSE.md`](./LICENSE.md) for details.
