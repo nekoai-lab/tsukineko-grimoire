@@ -30,6 +30,7 @@ export async function GET(req: Request) {
   }
 
   try {
+    console.log('[arxiv-preview] fetching', id);
     const res = await fetch(
       `https://export.arxiv.org/api/query?id_list=${id}&max_results=1`,
       {
@@ -81,7 +82,12 @@ export async function GET(req: Request) {
     };
     return Response.json(preview);
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
+    console.error('[arxiv-preview] error', {
+      name:    err instanceof Error ? err.name    : typeof err,
+      message: err instanceof Error ? err.message : String(err),
+      id,
+    });
+    if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
       return Response.json({ error: 'arXiv API がタイムアウトしました。時間をおいて再試行してください' }, { status: 504 });
     }
     return Response.json({ error: 'ネットワークエラーが発生しました' }, { status: 500 });
