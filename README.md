@@ -84,6 +84,15 @@
 
 ---
 
+## Recent Updates
+
+- Citation Preview のタイトル表示不具合を修正（プレースホルダー文字列が残り続ける問題・通常経路のレイアウト崩れ）
+- translated snippets と paper figure / table caption の翻訳結果を Firestore にキャッシュ（Translate API コスト削減）
+- chats の保存先を Firebase uid / browser guest id 単位に分離（共通 `default` ドキュメントを廃止）
+- 未認証時の `/login` リダイレクトを 307 → 303 に修正（POST リクエストが `/login` に引き継がれ 405 になる問題を解消）
+
+---
+
 ## 技術（開発者向け）
 
 Next.js / TypeScript、Firebase、Google Cloud（ストレージ・検索基盤）。  
@@ -103,3 +112,22 @@ WATCHPACK_POLLING=true npm run dev -- --port 3002
 本番デプロイ: Cloud Run（`.github/workflows/deploy.yml` 参照）
 
 仕様・API・管理者用 curl・設計メモは **`PRD.md`** に集約しています。
+
+### Behavior Notes
+
+**Chat / Session**
+
+- サインインユーザーは Firebase uid 単位で chats を Firestore に保存する。
+- ゲストユーザーは browser ごとに発行した guest id（`localStorage` に保持）で保存する。
+- 共通の `default` chat ドキュメントは使わない。
+
+**Translation Cache**
+
+- 同じ translated snippet や figure / table caption の翻訳結果は Firestore にキャッシュし、再翻訳しない。
+- Translate API の呼び出し回数とコストを抑えるための仕組み。
+
+**Citation Preview**
+
+- 日本語タイトル（`titleJa`）があれば優先表示し、英題はサブタイトルとして表示する。
+- `titleJa` が未取得の場合は英題、それもない場合は arXiv ID をフォールバックとして表示する。
+- `Loading document info...` のようなプレースホルダー文字列はパネルに表示しない。
