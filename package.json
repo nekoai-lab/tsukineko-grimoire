@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "backfill:shelf-summaries": "node scripts/backfill-shelf-summaries.mjs",
+    "backfill:shelf-summaries:dry": "DRY_RUN=1 node scripts/backfill-shelf-summaries.mjs"
   },
   "dependencies": {
     "@google-cloud/discoveryengine": "^2.5.3",
