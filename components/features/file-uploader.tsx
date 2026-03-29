@@ -97,8 +97,9 @@ function ArxivIdTab() {
     });
     setEntries(initial);
 
-    // 有効な ID を並列で取得（check=1 で書庫の重複を確認）
+    // 有効な ID を順番にずらして取得（arXiv API レート制限対策: 350ms 間隔）
     await Promise.all(lines.map(async (raw, i) => {
+      await new Promise(r => setTimeout(r, i * 350));
       const id = parseArxivId(raw);
       if (!id) return;
       try {
@@ -109,7 +110,6 @@ function ArxivIdTab() {
         } else if (!res.ok) {
           updateEntry(i, { kind: 'error', arxivId: id, message: data.error ?? '取得失敗' });
         } else if (data.inLibrary) {
-          // 検索段階で書庫重複を検出
           updateEntry(i, { kind: 'duplicate', arxivId: id, title: data.title });
         } else {
           updateEntry(i, { kind: 'preview', data });

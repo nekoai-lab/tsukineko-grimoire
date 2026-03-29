@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       `https://export.arxiv.org/api/query?id_list=${id}&max_results=1`,
       {
         headers: { 'User-Agent': USER_AGENT },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(15000),
       }
     );
 
@@ -80,7 +80,10 @@ export async function GET(req: Request) {
       ...(checkExists ? { inLibrary: inLibrary ?? false } : {}),
     };
     return Response.json(preview);
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return Response.json({ error: 'arXiv API がタイムアウトしました。時間をおいて再試行してください' }, { status: 504 });
+    }
     return Response.json({ error: 'ネットワークエラーが発生しました' }, { status: 500 });
   }
 }
