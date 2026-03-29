@@ -606,8 +606,8 @@ function DocCard({
         <BookOpen size={15} className="text-purple-400/40 flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0 space-y-1.5">
 
-          {/* Title row */}
-          <div className="flex items-start justify-between gap-2">
+          {/* Title row — mobile: 縦積み / sm+: 横並び */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5 sm:gap-2">
             <div className="flex-1 min-w-0 space-y-0.5">
               {/* 日本語タイトル（メイン） */}
               {doc.titleJa ? (
@@ -627,7 +627,7 @@ function DocCard({
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <StatusBadge status={doc.status} />
-              {/* 本棚ボタン */}
+              {/* 本棚ボタン — モバイルでは短縮ラベル */}
               <button
                 onClick={handleShelf}
                 disabled={shelfLoading}
@@ -640,7 +640,8 @@ function DocCard({
                   }`}
               >
                 <span>🗂</span>
-                <span>{isShelved ? '登録済み' : '本棚に追加'}</span>
+                <span className="sm:hidden">{isShelved ? '済' : '追加'}</span>
+                <span className="hidden sm:inline">{isShelved ? '登録済み' : '本棚に追加'}</span>
               </button>
               <span className="text-purple-500/40 text-xs">{expanded ? '▲' : '▼'}</span>
             </div>
@@ -748,11 +749,11 @@ function DocCard({
           )}
 
           {/* Action links */}
-          <div className="flex flex-wrap items-center gap-2 pt-0.5" onClick={e => e.stopPropagation()}>
+          <div className="flex flex-wrap items-center gap-2 pt-1" onClick={e => e.stopPropagation()}>
             {doc.arxivId && (
               <a
                 href={`/grimoire?arxivId=${doc.arxivId}`}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-600/20 text-xs text-purple-200/90
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-purple-600/20 text-xs text-purple-200/90
                   shadow-[0_0_10px_rgba(168,85,247,0.15)] border border-purple-500/30
                   hover:bg-purple-500/30 hover:shadow-[0_0_15px_rgba(168,85,247,0.25)] transition-all"
               >
@@ -764,11 +765,11 @@ function DocCard({
                 href={`https://arxiv.org/html/${doc.arxivId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-purple-400/60
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-purple-400/60
                   hover:text-purple-300 transition-colors"
               >
                 <ExternalLink size={11} />
-                HTML版（グラフ付き）
+                HTML版
               </a>
             )}
             {doc.arxivId && (
@@ -776,7 +777,7 @@ function DocCard({
                 href={`https://arxiv.org/pdf/${doc.arxivId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-purple-400/40
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-purple-400/40
                   hover:text-purple-300/60 transition-colors"
               >
                 <ExternalLink size={11} />
