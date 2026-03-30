@@ -28,9 +28,11 @@ export default function LandingPage() {
       <ParticleBackground />
 
       {/* ── Hero ── */}
-      <section className="relative z-10 flex flex-col md:flex-row items-center justify-center
-        min-h-screen gap-10 px-6 py-16 md:py-0 max-w-5xl mx-auto w-full">
+      <section className="relative z-10 flex flex-col gap-8 md:gap-10 justify-center
+        min-h-screen px-6 py-16 md:py-0 max-w-5xl mx-auto w-full">
 
+        {/* 上段: キャラ + コピー〜CTA（PC は上揃え） */}
+        <div className="flex flex-col md:flex-row items-center md:items-start justify-center gap-10 w-full">
         {/* キャラクター */}
         <div className="flex-shrink-0 flex justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -44,7 +46,7 @@ export default function LandingPage() {
         </div>
 
         {/* テキストブロック */}
-        <div className="text-center md:text-left">
+        <div className="text-center md:text-left min-w-0 flex-1">
           {/* タイトル */}
           <h1 className="text-4xl md:text-5xl font-bold mb-1 text-transparent bg-clip-text
             bg-gradient-to-r from-purple-300 to-yellow-400 leading-tight">
@@ -82,7 +84,7 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* CTA + デモ動画（横幅 max-w-md でサブコピーと揃える） */}
+          {/* CTA（横幅 max-w-md でサブコピーと揃える） */}
           <div className="w-full max-w-md mx-auto md:mx-0 space-y-3">
             <div className="flex flex-col sm:flex-row gap-3 md:justify-start justify-center">
               <Link
@@ -107,25 +109,28 @@ export default function LandingPage() {
             <p className="text-purple-400/35 text-[10px] md:text-left text-center">
               ゲスト利用可 · 登録不要で閲覧できます
             </p>
-            <div className="pt-1">
-              <p className="text-purple-400/50 text-[11px] mb-2 md:text-left text-center">
-                使い方デモ動画
-              </p>
-              <div
-                className="relative w-full overflow-hidden rounded-xl border border-purple-500/25
-                  bg-black/50 shadow-[0_0_24px_rgba(88,28,135,0.15)] aspect-video"
-              >
-                <iframe
-                  className="absolute inset-0 h-full w-full"
-                  src={`https://www.youtube.com/embed/${DEMO_VIDEO_ID}`}
-                  title="月ねこグリモワール 使い方デモ"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                />
-              </div>
-            </div>
+          </div>
+        </div>
+        </div>
+
+        {/* 下段: デモ動画（セクション全幅＝キャラ左端〜右コンテンツ右端） */}
+        <div className="w-full">
+          <p className="text-purple-400/50 text-[11px] mb-2 text-center md:text-left">
+            使い方デモ動画
+          </p>
+          <div
+            className="relative w-full overflow-hidden rounded-xl border border-purple-500/25
+              bg-black/50 shadow-[0_0_24px_rgba(88,28,135,0.15)] aspect-video"
+          >
+            <iframe
+              className="absolute inset-0 h-full w-full"
+              src={`https://www.youtube.com/embed/${DEMO_VIDEO_ID}`}
+              title="月ねこグリモワール 使い方デモ"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
           </div>
         </div>
       </section>
