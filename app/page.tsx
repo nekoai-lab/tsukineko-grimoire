@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { ParticleBackground } from '@/components/magic-ui/particle-bg';
 
+/** トップページ埋め込み: 使い方デモ（YouTube） */
+const DEMO_VIDEO_ID = 'aFHqisqeMfI';
+
 const FEATURES = [
   {
     symbol: '◎',
@@ -79,28 +82,51 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* CTA */}
-          <div className="flex flex-col sm:flex-row gap-3 md:justify-start justify-center">
-            <Link
-              href="/login"
-              className="bg-purple-700 hover:bg-purple-600 text-white font-semibold
-                px-8 py-3 text-sm rounded-lg inline-block text-center
-                hover:shadow-[0_0_24px_rgba(167,139,250,0.6)] transition-all duration-300"
-            >
-              ログインに進む
-            </Link>
-            <Link
-              href="/grimoire"
-              className="border border-purple-500/40 text-purple-300/80 hover:text-purple-200
-                hover:border-purple-400/60 font-semibold px-8 py-3 text-sm rounded-lg
-                inline-block text-center transition-all duration-300"
-            >
-              まず試してみる
-            </Link>
+          {/* CTA + デモ動画（横幅 max-w-md でサブコピーと揃える） */}
+          <div className="w-full max-w-md mx-auto md:mx-0 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3 md:justify-start justify-center">
+              <Link
+                href="/login"
+                className="bg-purple-700 hover:bg-purple-600 text-white font-semibold
+                  px-8 py-3 text-sm rounded-lg inline-block text-center
+                  hover:shadow-[0_0_24px_rgba(167,139,250,0.6)] transition-all duration-300
+                  sm:flex-1"
+              >
+                ログインに進む
+              </Link>
+              <Link
+                href="/grimoire"
+                className="border border-purple-500/40 text-purple-300/80 hover:text-purple-200
+                  hover:border-purple-400/60 font-semibold px-8 py-3 text-sm rounded-lg
+                  inline-block text-center transition-all duration-300
+                  sm:flex-1"
+              >
+                まず試してみる
+              </Link>
+            </div>
+            <p className="text-purple-400/35 text-[10px] md:text-left text-center">
+              ゲスト利用可 · 登録不要で閲覧できます
+            </p>
+            <div className="pt-1">
+              <p className="text-purple-400/50 text-[11px] mb-2 md:text-left text-center">
+                使い方デモ動画
+              </p>
+              <div
+                className="relative w-full overflow-hidden rounded-xl border border-purple-500/25
+                  bg-black/50 shadow-[0_0_24px_rgba(88,28,135,0.15)] aspect-video"
+              >
+                <iframe
+                  className="absolute inset-0 h-full w-full"
+                  src={`https://www.youtube.com/embed/${DEMO_VIDEO_ID}`}
+                  title="月ねこグリモワール 使い方デモ"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              </div>
+            </div>
           </div>
-          <p className="text-purple-400/35 text-[10px] mt-2 md:text-left text-center">
-            ゲスト利用可 · 登録不要で閲覧できます
-          </p>
         </div>
       </section>
 
