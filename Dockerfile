@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 
 FROM base AS deps
 WORKDIR /app
@@ -31,6 +31,9 @@ ENV NEXT_PUBLIC_ADMIN_EMAIL=$NEXT_PUBLIC_ADMIN_EMAIL
 RUN npm run build
 
 FROM base AS runner
+# Node.js 2026-10-21 のセキュリティリリース（CVE-2026-111497 ほか）より前の版では作らない。
+# ベースイメージの取り違えやキャッシュで古い Node が入ったら、ここでビルドを止める。
+RUN node -e "const m={22:[23,4],24:[22,1],26:[12,1]};const [a,b,c]=process.versions.node.split('.').map(Number);const min=m[a];const ok=a>26||(min&&(b>min[0]||(b===min[0]&&c>=min[1])));if(!ok){console.error('Node '+process.version+' は 2026-10-21 のセキュリティ修正より前か、サポート外');process.exit(1)}"
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
