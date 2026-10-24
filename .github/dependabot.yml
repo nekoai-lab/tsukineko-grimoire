@@ -4,3 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Node 25 までの奇数の版（23・25）は LTS にならずサポートが約8か月で終わるので上げない
+    # （27 からはすべての版が LTS になる。出典 https://github.com/nodejs/Release 、2026-10-25 確認。見直す日 2027-10-20）
+    # （ai-dev-harness/policies/dependencies.md。2026-10-24 月ねこが承認）
+    ignore:
+      - dependency-name: node
+        versions: [">= 23, < 24", ">= 25, < 26"]
