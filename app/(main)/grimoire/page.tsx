@@ -3,7 +3,7 @@ import { ParticleBackground } from '@/components/magic-ui/particle-bg';
 
 export const dynamic = 'force-dynamic';
 
-/** Next.js 14 では searchParams は同期オブジェクト（15 以降の Promise パターンは使わない） */
+/** Next.js 15 から searchParams は Promise（await してから読む） */
 function pickArxivId(
   raw: string | string[] | undefined
 ): string | undefined {
@@ -15,12 +15,13 @@ function pickArxivId(
   return undefined;
 }
 
-export default function GrimoirePage({
+export default async function GrimoirePage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const initialArxivId = pickArxivId(searchParams.arxivId);
+  const { arxivId } = await searchParams;
+  const initialArxivId = pickArxivId(arxivId);
 
   return (
     <div className="h-[calc(100dvh-52px)] relative">
