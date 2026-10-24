@@ -4,3 +4,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Node の奇数の版（23・25・27）はサポートが半年で終わるので上げない。LTS（偶数の版）だけにする
+    # （ai-dev-harness/policies/dependencies.md。2026-10-24 月ねこが承認）
+    ignore:
+      - dependency-name: node
+        versions: [">= 23, < 24", ">= 25, < 26", ">= 27, < 28"]
