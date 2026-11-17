@@ -1,6 +1,21 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+@layer base {
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+  }
+
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  :disabled {
+    cursor: default;
+  }
+}
 
 :root {
   --void-black: #0a0a0a;
@@ -23,12 +38,14 @@ body {
 }
 
 @layer components {
-  .glass-panel {
+  .glass-panel,
+  .glass-panel-hover,
+  .scroll-card {
     @apply bg-black/60 backdrop-blur-xl border border-purple-500/20 rounded-lg;
   }
 
   .glass-panel-hover {
-    @apply glass-panel hover:border-purple-400/40 transition-all duration-300;
+    @apply hover:border-purple-400/40 transition-all duration-300;
   }
 
   .glow-button {
@@ -45,7 +62,7 @@ body {
 
   .magic-input {
     @apply bg-black/40 border border-purple-500/30 rounded-lg text-white
-      placeholder:text-purple-300/40 focus:outline-none focus:border-purple-400
+      placeholder:text-purple-300/40 focus:outline-hidden focus:border-purple-400
       focus:shadow-[0_0_10px_rgba(167,139,250,0.3)] transition-all duration-200;
   }
 
@@ -57,14 +74,14 @@ body {
   }
 
   .scroll-card {
-    @apply glass-panel p-4 hover:border-purple-400/40 cursor-pointer
+    @apply p-4 hover:border-purple-400/40 cursor-pointer
       transition-all duration-300 hover:translate-y-[-2px]
       hover:shadow-[0_4px_20px_rgba(124,58,237,0.2)];
   }
 
   .magic-title {
     font-family: 'Cinzel', serif;
-    @apply text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-yellow-400;
+    @apply text-transparent bg-clip-text bg-linear-to-r/srgb from-purple-300 to-yellow-400;
   }
 }
 

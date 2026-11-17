@@ -184,7 +184,7 @@ function ArxivIdTab() {
           disabled={searching}
           className="w-full bg-purple-900/20 border border-purple-500/30 rounded-lg
             px-3 py-2.5 text-purple-100 text-sm placeholder-purple-500/35
-            focus:outline-none focus:border-purple-400/60 transition-colors
+            focus:outline-hidden focus:border-purple-400/60 transition-colors
             resize-none font-mono leading-relaxed disabled:opacity-50"
         />
         <div className="flex items-center justify-between">
@@ -360,12 +360,12 @@ function EntryCard({ entry, onRegister }: { entry: EntryStatus; onRegister: () =
         )}
         {data.publishedAt && <span>{data.publishedAt.slice(0, 4)}</span>}
         {data.category && (
-          <span className="bg-purple-900/40 border border-purple-500/20 rounded px-1.5 py-0.5">{data.category}</span>
+          <span className="bg-purple-900/40 border border-purple-500/20 rounded-sm px-1.5 py-0.5">{data.category}</span>
         )}
         {(data.tags ?? []).map(t => (
           <span
             key={t}
-            className="bg-purple-900/25 border border-purple-500/15 rounded px-1.5 py-0.5 text-purple-300/65"
+            className="bg-purple-900/25 border border-purple-500/15 rounded-sm px-1.5 py-0.5 text-purple-300/65"
           >
             #{t}
           </span>
@@ -457,7 +457,7 @@ function OtherDocTab({ onSuccess }: { onSuccess?: () => void }) {
 
   const inputClass = `w-full bg-purple-900/20 border border-purple-500/30 rounded-lg px-3 py-2
     text-purple-100 text-sm placeholder-purple-500/40
-    focus:outline-none focus:border-purple-400/60 transition-colors`;
+    focus:outline-hidden focus:border-purple-400/60 transition-colors`;
   const labelClass = 'text-purple-300/60 text-xs';
 
   return (

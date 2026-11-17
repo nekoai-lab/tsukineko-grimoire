@@ -416,7 +416,7 @@ export function ShelfLibrary({ userId }: ShelfLibraryProps) {
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full bg-purple-950/50 border border-purple-500/25 rounded-xl pl-8 pr-4 py-2
                 text-purple-200/90 text-xs placeholder:text-purple-500/40
-                focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+                focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
             />
             {searchQuery && (
               <button
@@ -484,7 +484,7 @@ export function ShelfLibrary({ userId }: ShelfLibraryProps) {
                 value={filterCategory}
                 onChange={e => setFilterCategory(e.target.value)}
                 className="bg-purple-950/50 border border-purple-500/25 rounded-lg px-2 py-1 ml-1
-                  text-purple-200/90 text-[11px] max-w-[11rem] focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+                  text-purple-200/90 text-[11px] max-w-[11rem] focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
               >
                 <option value="">すべて</option>
                 {categoryOptions.map(c => (
@@ -500,7 +500,7 @@ export function ShelfLibrary({ userId }: ShelfLibraryProps) {
                 value={filterReadStatus}
                 onChange={e => setFilterReadStatus((e.target.value || '') as '' | ShelfReadStatus)}
                 className="bg-purple-950/50 border border-purple-500/25 rounded-lg px-2 py-1 ml-1
-                  text-purple-200/90 text-[11px] focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+                  text-purple-200/90 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
               >
                 <option value="">すべて</option>
                 {(Object.keys(READ_STATUS_LABELS) as ShelfReadStatus[]).map(k => (
@@ -516,7 +516,7 @@ export function ShelfLibrary({ userId }: ShelfLibraryProps) {
                 value={filterTheme}
                 onChange={e => setFilterTheme(e.target.value)}
                 className="bg-purple-950/50 border border-purple-500/25 rounded-lg px-2 py-1 ml-1
-                  text-purple-200/90 text-[11px] focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+                  text-purple-200/90 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
               >
                 <option value="">すべて</option>
                 {Object.entries(THEME_LABELS).map(([k, { emoji, label }]) => (
@@ -589,7 +589,7 @@ export function ShelfLibrary({ userId }: ShelfLibraryProps) {
                 value={addedDays ?? ''}
                 onChange={e => setAddedDays(e.target.value === '' ? null : Number(e.target.value))}
                 className="bg-purple-950/50 border border-purple-500/25 rounded-lg px-2 py-1 ml-1
-                  text-purple-200/90 text-[11px] focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+                  text-purple-200/90 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
               >
                 {ADDED_DAYS_OPTIONS.map(o => (
                   <option key={String(o.value)} value={o.value ?? ''}>{o.label}</option>
@@ -684,7 +684,7 @@ export function ShelfLibrary({ userId }: ShelfLibraryProps) {
                 value={sortKey}
                 onChange={e => setSortKey(e.target.value as SortKey)}
                 className="bg-purple-950/50 border border-purple-500/25 rounded-lg px-2 py-1
-                  text-purple-200/90 text-[11px] focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+                  text-purple-200/90 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
               >
                 {SORT_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -846,7 +846,7 @@ function ShelfKanbanCard({ item }: { item: ShelfItem }) {
         e.dataTransfer.setData(KANBAN_DRAG_MIME, item.id);
         e.dataTransfer.effectAllowed = 'move';
       }}
-      className="rounded-lg border border-purple-500/20 bg-[#120c1f]/95 p-2.5 shadow-sm
+      className="rounded-lg border border-purple-500/20 bg-[#120c1f]/95 p-2.5 shadow-xs
         cursor-grab active:cursor-grabbing hover:border-purple-400/35 transition-colors
         select-none"
     >
@@ -861,7 +861,7 @@ function ShelfKanbanCard({ item }: { item: ShelfItem }) {
           )}
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             {item.category && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/40 border border-purple-500/20 text-purple-300/70">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-purple-900/40 border border-purple-500/20 text-purple-300/70">
                 {item.category}
               </span>
             )}
@@ -910,7 +910,7 @@ function ShelfMemoCell({
       onClick={e => e.stopPropagation()}
       placeholder="メモ…"
       className={`w-full min-w-[7rem] bg-purple-950/40 border border-purple-500/20 rounded-lg px-2 py-1
-        text-purple-200/85 text-[11px] leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-purple-400/40
+        text-purple-200/85 text-[11px] leading-relaxed resize-y focus:outline-hidden focus:ring-1 focus:ring-purple-400/40
         placeholder:text-purple-500/35 ${wide ? 'max-w-none' : 'max-w-[14rem]'}`}
     />
   );
@@ -953,14 +953,14 @@ function ShelfUserTagsCell({
         {tags.map(t => (
           <span
             key={t}
-            className="inline-flex items-center gap-0.5 pl-1 pr-0.5 py-0.5 rounded text-[10px]
+            className="inline-flex items-center gap-0.5 pl-1 pr-0.5 py-0.5 rounded-sm text-[10px]
               bg-amber-900/25 border border-amber-600/25 text-amber-200/80"
           >
             <span className="truncate max-w-[4.5rem]" title={t}>#{t}</span>
             <button
               type="button"
               onClick={() => remove(t)}
-              className="p-0.5 rounded hover:bg-amber-800/40 text-amber-300/70"
+              className="p-0.5 rounded-sm hover:bg-amber-800/40 text-amber-300/70"
               title="削除"
             >
               <X size={10} />
@@ -974,13 +974,13 @@ function ShelfUserTagsCell({
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
           placeholder="追加"
-          className="flex-1 min-w-0 bg-purple-950/40 border border-purple-500/20 rounded px-1.5 py-0.5
-            text-[10px] text-purple-200 focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+          className="flex-1 min-w-0 bg-purple-950/40 border border-purple-500/20 rounded-sm px-1.5 py-0.5
+            text-[10px] text-purple-200 focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
         />
         <button
           type="button"
           onClick={add}
-          className="p-1 rounded border border-purple-500/25 text-purple-400 hover:bg-purple-800/30"
+          className="p-1 rounded-sm border border-purple-500/25 text-purple-400 hover:bg-purple-800/30"
           title="タグを追加"
         >
           <Plus size={12} />
@@ -1057,7 +1057,7 @@ function ShelfTableRow({
             }}
             onClick={e => e.stopPropagation()}
             className="w-full max-w-[6.5rem] bg-purple-950/60 border border-purple-500/25 rounded-lg px-1.5 py-1
-              text-[11px] text-purple-200 focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+              text-[11px] text-purple-200 focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
           >
             {(Object.keys(READ_STATUS_LABELS) as ShelfReadStatus[]).map(k => (
               <option key={k} value={k}>{READ_STATUS_LABELS[k]}</option>
@@ -1073,7 +1073,7 @@ function ShelfTableRow({
       {cols.category && (
         <td className="px-3 py-2 align-top">
           {item.category ? (
-            <span className="inline-block px-1.5 py-0.5 rounded bg-purple-900/40 border border-purple-500/20 text-purple-300/75">
+            <span className="inline-block px-1.5 py-0.5 rounded-sm bg-purple-900/40 border border-purple-500/20 text-purple-300/75">
               {item.category}
             </span>
           ) : (
@@ -1084,7 +1084,7 @@ function ShelfTableRow({
       {cols.theme && (
         <td className="px-3 py-2 align-top whitespace-nowrap">
           {item.theme && THEME_LABELS[item.theme] ? (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-900/40 border border-purple-500/20 text-purple-300/75 text-[11px]">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-purple-900/40 border border-purple-500/20 text-purple-300/75 text-[11px]">
               {THEME_LABELS[item.theme].emoji} {THEME_LABELS[item.theme].label}
             </span>
           ) : (
@@ -1121,7 +1121,7 @@ function ShelfTableRow({
               (item.tags ?? []).slice(0, 4).map(t => (
                 <span
                   key={t}
-                  className="text-[10px] px-1 py-0.5 rounded bg-purple-900/30 border border-purple-500/15 text-purple-400/70 truncate max-w-full"
+                  className="text-[10px] px-1 py-0.5 rounded-sm bg-purple-900/30 border border-purple-500/15 text-purple-400/70 truncate max-w-full"
                   title={t}
                 >
                   #{t}
@@ -1318,7 +1318,7 @@ function ShelfCard({
                   } catch { /* noop */ }
                 }}
                 className="w-full max-w-[12rem] bg-purple-950/60 border border-purple-500/25 rounded-lg px-2 py-1.5
-                  text-xs text-purple-200 focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+                  text-xs text-purple-200 focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
               >
                 {(Object.keys(READ_STATUS_LABELS) as ShelfReadStatus[]).map(k => (
                   <option key={k} value={k}>{READ_STATUS_LABELS[k]}</option>

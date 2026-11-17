@@ -147,7 +147,7 @@ export function MessageBubble({ role, content, citations, suggestions, relatedDo
             className="fixed z-[9999] -translate-x-1/2 -translate-y-full
               flex items-center gap-1.5 px-3 py-1.5 rounded-full
               bg-purple-700/90 border border-purple-400/40 text-white text-xs
-              shadow-lg shadow-purple-900/50 backdrop-blur-sm
+              shadow-lg shadow-purple-900/50 backdrop-blur-xs
               hover:bg-purple-600/90 transition-colors cursor-pointer"
             style={{ left: tooltip.x, top: tooltip.y }}
           >
@@ -245,7 +245,7 @@ export function MessageBubble({ role, content, citations, suggestions, relatedDo
                       {children}
                     </code>
                   ) : (
-                    <code className="bg-purple-900/40 rounded px-1.5 py-0.5 text-xs
+                    <code className="bg-purple-900/40 rounded-sm px-1.5 py-0.5 text-xs
                       font-mono text-purple-200">
                       {children}
                     </code>

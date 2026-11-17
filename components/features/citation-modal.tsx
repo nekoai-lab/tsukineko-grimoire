@@ -36,7 +36,7 @@ export function CitationModal({ citation, onClose }: CitationModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs z-40"
           />
 
           {/* Modal */}

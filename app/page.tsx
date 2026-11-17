@@ -49,13 +49,13 @@ export default function LandingPage() {
         <div className="text-center md:text-left min-w-0 flex-1">
           {/* タイトル */}
           <h1 className="text-4xl md:text-5xl font-bold mb-1 text-transparent bg-clip-text
-            bg-gradient-to-r from-purple-300 to-yellow-400 leading-tight">
+            bg-linear-to-r/srgb from-purple-300 to-yellow-400 leading-tight">
             Tsukineko Grimoire
           </h1>
           <div className="flex items-center gap-3 mb-5 md:justify-start justify-center">
-            <div className="h-px w-8 bg-gradient-to-r from-transparent to-purple-400/45" />
+            <div className="h-px w-8 bg-linear-to-r/srgb from-transparent to-purple-400/45" />
             <p className="text-purple-300/60 text-xs tracking-[0.25em]">月ねこグリモワール</p>
-            <div className="h-px w-8 bg-gradient-to-l from-transparent to-purple-400/45" />
+            <div className="h-px w-8 bg-linear-to-l/srgb from-transparent to-purple-400/45" />
           </div>
 
           {/* メインコピー */}

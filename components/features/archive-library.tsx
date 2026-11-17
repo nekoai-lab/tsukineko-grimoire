@@ -394,7 +394,7 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
               placeholder={fullText ? 'タイトル・要約・著者を検索...' : 'タイトルを検索...'}
               className="w-full bg-purple-900/25 border border-purple-500/50 rounded-lg
                 pl-9 pr-3 py-2 text-purple-100 text-sm placeholder-purple-400/50
-                focus:outline-none focus:border-purple-400/80 focus:bg-purple-900/35
+                focus:outline-hidden focus:border-purple-400/80 focus:bg-purple-900/35
                 transition-colors"
             />
           </div>
@@ -424,7 +424,7 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
                 value={publishedYear}
                 onChange={e => setPublishedYear(e.target.value)}
                 className="bg-purple-950/50 border border-purple-500/25 rounded-lg px-2 py-1 ml-1
-                  text-purple-200/90 text-[11px] focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+                  text-purple-200/90 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
               >
                 <option value="">すべて</option>
                 {yearOptions.map(y => (
@@ -439,7 +439,7 @@ export function ArchiveLibrary({ userId }: ArchiveLibraryProps) {
               value={sortKey}
               onChange={e => setSortKey(e.target.value as typeof sortKey)}
               className="bg-purple-950/50 border border-purple-500/25 rounded-lg px-2 py-1 ml-1
-                text-purple-200/90 text-[11px] focus:outline-none focus:ring-1 focus:ring-purple-400/40"
+                text-purple-200/90 text-[11px] focus:outline-hidden focus:ring-1 focus:ring-purple-400/40"
             >
               <option value="uploadedDesc">追加日（新しい順）</option>
               <option value="publishedDesc">公開日（新しい順）</option>
@@ -518,7 +518,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
     <>
       {parts.map((part, i) =>
         part.toLowerCase() === query.toLowerCase() ? (
-          <mark key={i} className="bg-amber-400/30 text-amber-200 rounded-sm px-0.5 not-italic">
+          <mark key={i} className="bg-amber-400/30 text-amber-200 rounded-xs px-0.5 not-italic">
             {part}
           </mark>
         ) : (

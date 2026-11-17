@@ -319,9 +319,9 @@ export function ChatInterface({ initialArxivId }: ChatInterfaceProps) {
                 {/* 聞き方のコツ */}
                 <div>
                   <div className="flex items-center gap-2.5 mb-3">
-                    <div className="flex-1 h-px bg-gradient-to-r from-transparent to-purple-400/20" />
+                    <div className="flex-1 h-px bg-linear-to-r/srgb from-transparent to-purple-400/20" />
                     <p className="text-purple-300/50 text-[10px] font-semibold tracking-[0.18em] whitespace-nowrap">聞き方のコツ</p>
-                    <div className="flex-1 h-px bg-gradient-to-l from-transparent to-purple-400/20" />
+                    <div className="flex-1 h-px bg-linear-to-l/srgb from-transparent to-purple-400/20" />
                   </div>
                   <ul className="space-y-2 text-xs">
                     <li className="flex gap-2 text-purple-200/55">
@@ -342,9 +342,9 @@ export function ChatInterface({ initialArxivId }: ChatInterfaceProps) {
                 {/* 回答後にできること */}
                 <div>
                   <div className="flex items-center gap-2.5 mb-3">
-                    <div className="flex-1 h-px bg-gradient-to-r from-transparent to-purple-400/20" />
+                    <div className="flex-1 h-px bg-linear-to-r/srgb from-transparent to-purple-400/20" />
                     <p className="text-purple-300/50 text-[10px] font-semibold tracking-[0.18em] whitespace-nowrap">回答後にできること</p>
-                    <div className="flex-1 h-px bg-gradient-to-l from-transparent to-purple-400/20" />
+                    <div className="flex-1 h-px bg-linear-to-l/srgb from-transparent to-purple-400/20" />
                   </div>
                   <ul className="space-y-2 text-xs">
                     <li className="flex gap-2 text-purple-200/55">
@@ -361,9 +361,9 @@ export function ChatInterface({ initialArxivId }: ChatInterfaceProps) {
                 {/* 仕組みと注意点 */}
                 <div>
                   <div className="flex items-center gap-2.5 mb-3">
-                    <div className="flex-1 h-px bg-gradient-to-r from-transparent to-purple-400/20" />
+                    <div className="flex-1 h-px bg-linear-to-r/srgb from-transparent to-purple-400/20" />
                     <p className="text-purple-300/50 text-[10px] font-semibold tracking-[0.18em] whitespace-nowrap">仕組みと注意点</p>
-                    <div className="flex-1 h-px bg-gradient-to-l from-transparent to-purple-400/20" />
+                    <div className="flex-1 h-px bg-linear-to-l/srgb from-transparent to-purple-400/20" />
                   </div>
                   <ul className="space-y-2 text-xs">
                     <li className="flex gap-2 text-purple-200/40">
@@ -640,7 +640,7 @@ function ResultTableCard({ table }: { table: ResultTable }) {
             {/* グラデーションフェード（折りたたみ時） */}
             {isTall && !rawExpanded && (
               <div className="absolute bottom-0 inset-x-0 h-12 pointer-events-none
-                bg-gradient-to-t from-[#0f0920] to-transparent rounded-b-lg" />
+                bg-linear-to-t/srgb from-[#0f0920] to-transparent rounded-b-lg" />
             )}
           </div>
 
@@ -941,7 +941,7 @@ function CitationPanelContent({
               )}
               {enriched.publishedAt && <span>{enriched.publishedAt.slice(0, 4)}</span>}
               {enriched.category && (
-                <span className="bg-purple-900/40 border border-purple-500/20 rounded px-1.5 py-0.5">
+                <span className="bg-purple-900/40 border border-purple-500/20 rounded-sm px-1.5 py-0.5">
                   {enriched.category}
                 </span>
               )}
@@ -1113,7 +1113,7 @@ function CitationPanelContent({
               {/* グラデーションフェード（折りたたみ時のみ） */}
               {!summaryOpen && (
                 <div className="absolute bottom-0 inset-x-0 h-10 pointer-events-none
-                  bg-gradient-to-t from-[#130d24] to-transparent" />
+                  bg-linear-to-t/srgb from-[#130d24] to-transparent" />
               )}
             </div>
 

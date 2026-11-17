@@ -189,7 +189,7 @@ export function SettingsPanel() {
                 <p className="text-purple-200 text-sm font-medium">{user.displayName}</p>
                 <p className="text-purple-300/60 text-xs">{user.email}</p>
                 {isAdmin && (
-                  <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-purple-700/30 border border-purple-500/30 text-purple-300/70">
+                  <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded-sm bg-purple-700/30 border border-purple-500/30 text-purple-300/70">
                     管理者
                   </span>
                 )}
@@ -237,7 +237,7 @@ export function SettingsPanel() {
                   collectorEnabled ? 'bg-purple-600' : 'bg-purple-900/50'
                 }`}
               >
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
                   collectorEnabled ? 'translate-x-5' : 'translate-x-0.5'
                 }`} />
               </div>
@@ -272,7 +272,7 @@ export function SettingsPanel() {
                     onChange={e => setKeywordsInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addKeyword()}
                     placeholder="キーワードを追加..."
-                    className="flex-1 bg-purple-900/20 border border-purple-500/20 rounded-lg px-3 py-1.5 text-purple-200 text-sm placeholder-purple-400/30 focus:outline-none focus:border-purple-500/50"
+                    className="flex-1 bg-purple-900/20 border border-purple-500/20 rounded-lg px-3 py-1.5 text-purple-200 text-sm placeholder-purple-400/30 focus:outline-hidden focus:border-purple-500/50"
                   />
                   <button
                     onClick={addKeyword}
@@ -292,7 +292,7 @@ export function SettingsPanel() {
                     value={maxResults}
                     onChange={e => setMaxResults(Math.min(20, Math.max(1, Number(e.target.value))))}
                     min={1} max={20}
-                    className="w-full bg-purple-900/20 border border-purple-500/20 rounded-lg px-3 py-1.5 text-purple-200 text-sm focus:outline-none focus:border-purple-500/50"
+                    className="w-full bg-purple-900/20 border border-purple-500/20 rounded-lg px-3 py-1.5 text-purple-200 text-sm focus:outline-hidden focus:border-purple-500/50"
                   />
                 </div>
                 <div>
@@ -302,7 +302,7 @@ export function SettingsPanel() {
                     value={minCitations}
                     onChange={e => setMinCitations(Math.max(0, Number(e.target.value)))}
                     min={0}
-                    className="w-full bg-purple-900/20 border border-purple-500/20 rounded-lg px-3 py-1.5 text-purple-200 text-sm focus:outline-none focus:border-purple-500/50"
+                    className="w-full bg-purple-900/20 border border-purple-500/20 rounded-lg px-3 py-1.5 text-purple-200 text-sm focus:outline-hidden focus:border-purple-500/50"
                   />
                   <p className="text-purple-400/50 text-xs mt-0.5">0 = フィルタ無効</p>
                 </div>

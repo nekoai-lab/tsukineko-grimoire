@@ -55,23 +55,23 @@ export default function LoginPage() {
       <div className="glass-panel p-8 max-w-md w-full relative z-10">
         {/* ヘッダー */}
         <div className="text-5xl text-center mb-3 animate-levitate">🌙</div>
-        <h1 className="text-3xl font-bold text-center mb-3 text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-yellow-400">
+        <h1 className="text-3xl font-bold text-center mb-3 text-transparent bg-clip-text bg-linear-to-r/srgb from-purple-300 to-yellow-400">
           Tsukineko Grimoire
         </h1>
         <div className="flex items-center justify-center gap-3 mb-7">
-          <div className="h-px w-10 bg-gradient-to-r from-transparent to-purple-400/45" />
+          <div className="h-px w-10 bg-linear-to-r/srgb from-transparent to-purple-400/45" />
           <p className="text-purple-300/60 text-xs tracking-[0.25em]">月ねこグリモワール</p>
-          <div className="h-px w-10 bg-gradient-to-l from-transparent to-purple-400/45" />
+          <div className="h-px w-10 bg-linear-to-l/srgb from-transparent to-purple-400/45" />
         </div>
 
         {/* ゲストでもできること */}
         <div className="mb-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent to-purple-400/25" />
+            <div className="flex-1 h-px bg-linear-to-r/srgb from-transparent to-purple-400/25" />
             <p className="text-purple-300/50 text-[10px] font-semibold tracking-[0.18em] whitespace-nowrap">
               ゲストでもできること
             </p>
-            <div className="flex-1 h-px bg-gradient-to-l from-transparent to-purple-400/25" />
+            <div className="flex-1 h-px bg-linear-to-l/srgb from-transparent to-purple-400/25" />
           </div>
           <div className="space-y-2 px-1">
             {GUEST_FEATURES.map(f => (
@@ -87,11 +87,11 @@ export default function LoginPage() {
         {/* Google サインインするとさらに */}
         <div className="mb-7">
           <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent to-purple-400/35" />
+            <div className="flex-1 h-px bg-linear-to-r/srgb from-transparent to-purple-400/35" />
             <p className="text-purple-300/70 text-[10px] font-semibold tracking-[0.18em] whitespace-nowrap">
               Google サインインするとさらに
             </p>
-            <div className="flex-1 h-px bg-gradient-to-l from-transparent to-purple-400/35" />
+            <div className="flex-1 h-px bg-linear-to-l/srgb from-transparent to-purple-400/35" />
           </div>
           <div className="space-y-2 px-1">
             {LOGIN_FEATURES.map(f => (
@@ -102,7 +102,7 @@ export default function LoginPage() {
                 </span>
                 <span className="text-purple-300/30 text-xs flex-1">— {f.desc}</span>
                 {f.soon && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded border border-purple-500/20 text-purple-400/40 whitespace-nowrap shrink-0">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-sm border border-purple-500/20 text-purple-400/40 whitespace-nowrap shrink-0">
                     Coming Soon
                   </span>
                 )}
