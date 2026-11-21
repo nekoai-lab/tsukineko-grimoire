@@ -23,12 +23,10 @@ import { Storage } from '@google-cloud/storage';
 import { getAdminFirestore } from '@/lib/firebase-admin';
 import { pdfToMarkdown } from '@/lib/pdf-to-markdown';
 import { fetchArxivHtmlAsMarkdown } from '@/lib/html-to-markdown';
+import { isCronAuthorized } from '@/lib/cron-auth';
 
 function isAuthorized(req: Request): boolean {
-  if (req.headers.get('x-cloudscheduler-jobname')) return true;
-  const auth = req.headers.get('authorization') ?? '';
-  const secret = process.env.CRON_SECRET;
-  return !!secret && auth === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 export async function POST(req: Request) {
