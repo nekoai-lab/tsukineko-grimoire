@@ -1,0 +1,36 @@
+# PR の検証（2026-11-21 追加）
+# 本番は main への push で deploy.yml が自動デプロイする。マージ前に型と本番ビルドが通ることをここで確かめる。
+# 秘密は使わない（NEXT_PUBLIC_* が空でもビルドは通る。本番の値はデプロイ時に Docker ビルドへ渡す）。
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: typecheck & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          # 本番の Dockerfile と同じメジャー版で確かめる
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"

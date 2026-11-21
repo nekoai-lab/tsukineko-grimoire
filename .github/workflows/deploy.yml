@@ -17,6 +17,15 @@ on:
       - main        # main へのプッシュで本番デプロイ
   workflow_dispatch: # 手動実行も可
 
+# 連続マージで古いコミットのデプロイが最後に終わり、本番が古い版に戻るのを防ぐ（2026-11-19 に起きた）。
+# ① 同時に1本だけ走らせる（cancel-in-progress は使わない＝デプロイを途中で切らない）。待ちは1本だけ残る
+# ② 実行枠を取ってから main の先頭のコミットを調べ、**どの回でも main の先頭をデプロイする**（起動したコミットではない）。
+#    古い回の再実行が新しい回の待ちを取り消しても、その古い回が先頭をデプロイするので、本番は最新になる
+# ③ デプロイ後、本番の稼働リビジョンがそのコミットのイメージで、通信の100%を受けていることを確かめる
+concurrency:
+  group: deploy-cloud-run-production
+  cancel-in-progress: false
+
 env:
   PROJECT_ID: tsukineko-grimoire-dev
   REGION: asia-northeast1          # 東京リージョン
@@ -35,9 +44,24 @@ jobs:
       id-token: write  # Workload Identity Federation に必要
 
     steps:
-      # ① ソースコードを取得
+      # ①' 実行枠を取ったあとで main の先頭を調べる（取れなければ失敗にする。黙ってスキップしない）
+      - name: Resolve head of main
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::main の先頭を取れなかった（${SHA}）"; exit 1; fi
+          echo "trigger=${GITHUB_SHA} deploy=${SHA}"
+          if [ "$SHA" != "$GITHUB_SHA" ]; then echo "::notice::起動したコミット ${GITHUB_SHA} ではなく、main の先頭 ${SHA} をデプロイする"; fi
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      # ① ソースコードを取得（main の先頭）
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.head.outputs.sha }}
 
       # ② GCP へ認証（Workload Identity Federation）
       - name: Authenticate to Google Cloud
@@ -61,21 +85,27 @@ jobs:
             --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}" \
             --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}" \
             --build-arg NEXT_PUBLIC_ADMIN_EMAIL="${{ secrets.NEXT_PUBLIC_ADMIN_EMAIL }}" \
-            -t ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ github.sha }} \
+            -t ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }} \
             -t ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:latest \
             .
 
       # ⑤ Artifact Registry へ push
       - name: Push Docker image
+        id: push
         run: |
-          docker push ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ github.sha }}
+          set -euo pipefail
+          docker push ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }}
           docker push ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:latest
+          # このコミットのイメージを digest で固定する（同じタグへの push し直しで中身がずれないように。2026-11-19 に起きた）
+          REF="$(docker inspect --format '{{index .RepoDigests 0}}' ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }})"
+          case "$REF" in ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}@sha256:*) ;; *) echo "::error::push したイメージの digest を取れなかった（${REF}）"; exit 1 ;; esac
+          echo "image=${REF}" >> "$GITHUB_OUTPUT"
 
       # ⑥ Cloud Run へデプロイ（上記 SA で明示的に実行。Secret は Secret Manager 参照）
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ github.sha }} \
+            --image ${{ steps.push.outputs.image }} \
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
@@ -106,3 +136,23 @@ jobs:
           gcloud run services describe ${{ env.SERVICE_NAME }} \
             --region ${{ env.REGION }} \
             --format 'value(status.url)'
+
+      # ⑧ 本番が今デプロイしたコミットで動いていることを確かめる（違えば失敗にする）
+      - name: Verify serving revision
+        run: |
+          # Cloud Run のリビジョンはイメージを digest の形で持つ。push したのが OCI index（複数プラットフォーム）だと、
+          # Cloud Run は中の linux/amd64 の manifest の digest で持つ（2026-11-21 の回：push 8298c05… → 稼働 4ac4c53…）。
+          # index の digest と、その中の manifest の digest のどれかと一致すれば、このコミットのイメージとみなす
+          WANT="${{ steps.push.outputs.image }}"
+          BASE="${WANT%@*}"
+          OK="${WANT}"
+          for d in $(docker buildx imagetools inspect --raw "$WANT" | python3 -c 'import json,sys; m=json.load(sys.stdin); print(" ".join(x["digest"] for x in m.get("manifests",[])))'); do OK="${OK} ${BASE}@${d}"; done
+          READY="$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.latestReadyRevisionName)')"
+          IMAGE="$(gcloud run revisions describe "$READY" --region ${{ env.REGION }} --format 'value(status.imageDigest)')"
+          [ -n "$IMAGE" ] || IMAGE="$(gcloud run revisions describe "$READY" --region ${{ env.REGION }} --format 'value(spec.containers[0].image)')"
+          MATCH=no; for o in $OK; do [ "$IMAGE" = "$o" ] && MATCH=yes; done
+          SERVING="$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'json(status.traffic)' | python3 -c 'import json,sys; t=json.load(sys.stdin)["status"]["traffic"]; print(",".join(x.get("revisionName","")+":"+str(x.get("percent",0)) for x in t if x.get("percent")))')"
+          echo "ready=${READY} image=${IMAGE} serving=${SERVING}"
+          [ "$MATCH" = yes ] || { echo "::error::稼働リビジョンのイメージ（${IMAGE}）が push した ${OK} のどれでもない＝ ${{ steps.head.outputs.sha }} ではない"; exit 1; }
+          [ "$SERVING" = "${READY}:100" ] || { echo "::error::通信の100%が最新リビジョン ${READY} に向いていない（${SERVING}）"; exit 1; }
+          echo "### 本番の稼働：${READY}（${{ steps.head.outputs.sha }}、100%）" >> "$GITHUB_STEP_SUMMARY"
