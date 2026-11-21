@@ -10,15 +10,13 @@ import { getAdminAuth } from '@/lib/firebase-admin';
 import { parseArxivCategories } from '@/lib/arxiv-categories';
 import { classifyTheme } from '@/lib/classify-theme';
 import type * as FirebaseFirestore from '@google-cloud/firestore';
+import { isCronAuthorized } from '@/lib/cron-auth';
 
 const USER_AGENT = 'Tsukineko-Grimoire/1.0 (arXiv collector; contact via GitHub)';
 
 // Cloud Scheduler または CRON_SECRET による管理者認証
 function isAdminAuthorized(req: Request): boolean {
-  if (req.headers.get('x-cloudscheduler-jobname')) return true;
-  const auth = req.headers.get('authorization') ?? '';
-  const secret = process.env.CRON_SECRET;
-  return !!secret && auth === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 // デフォルトキーワード（Firestore の settings に上書き可能）
