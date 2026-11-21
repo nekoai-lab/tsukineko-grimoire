@@ -140,14 +140,19 @@ jobs:
       # ⑧ 本番が今デプロイしたコミットで動いていることを確かめる（違えば失敗にする）
       - name: Verify serving revision
         run: |
-          # Cloud Run のリビジョンはイメージを digest の形で持つので、push した digest と比べる
+          # Cloud Run のリビジョンはイメージを digest の形で持つ。push したのが OCI index（複数プラットフォーム）だと、
+          # Cloud Run は中の linux/amd64 の manifest の digest で持つ（2026-11-21 の回：push 8298c05… → 稼働 4ac4c53…）。
+          # index の digest と、その中の manifest の digest のどれかと一致すれば、このコミットのイメージとみなす
           WANT="${{ steps.push.outputs.image }}"
+          BASE="${WANT%@*}"
+          OK="${WANT}"
+          for d in $(docker buildx imagetools inspect --raw "$WANT" | python3 -c 'import json,sys; m=json.load(sys.stdin); print(" ".join(x["digest"] for x in m.get("manifests",[])))'); do OK="${OK} ${BASE}@${d}"; done
           READY="$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.latestReadyRevisionName)')"
-          DIGEST="$(gcloud run revisions describe "$READY" --region ${{ env.REGION }} --format 'value(status.imageDigest)')"
-          IMAGE="$(gcloud run revisions describe "$READY" --region ${{ env.REGION }} --format 'value(spec.containers[0].image)')"
-          [ "${DIGEST:-$IMAGE}" = "$WANT" ] && IMAGE="$WANT"
+          IMAGE="$(gcloud run revisions describe "$READY" --region ${{ env.REGION }} --format 'value(status.imageDigest)')"
+          [ -n "$IMAGE" ] || IMAGE="$(gcloud run revisions describe "$READY" --region ${{ env.REGION }} --format 'value(spec.containers[0].image)')"
+          MATCH=no; for o in $OK; do [ "$IMAGE" = "$o" ] && MATCH=yes; done
           SERVING="$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'json(status.traffic)' | python3 -c 'import json,sys; t=json.load(sys.stdin)["status"]["traffic"]; print(",".join(x.get("revisionName","")+":"+str(x.get("percent",0)) for x in t if x.get("percent")))')"
           echo "ready=${READY} image=${IMAGE} serving=${SERVING}"
-          [ "$IMAGE" = "$WANT" ] || { echo "::error::稼働リビジョンのイメージが ${{ steps.head.outputs.sha }} ではない"; exit 1; }
+          [ "$MATCH" = yes ] || { echo "::error::稼働リビジョンのイメージ（${IMAGE}）が push した ${OK} のどれでもない＝ ${{ steps.head.outputs.sha }} ではない"; exit 1; }
           [ "$SERVING" = "${READY}:100" ] || { echo "::error::通信の100%が最新リビジョン ${READY} に向いていない（${SERVING}）"; exit 1; }
           echo "### 本番の稼働：${READY}（${{ steps.head.outputs.sha }}、100%）" >> "$GITHUB_STEP_SUMMARY"
