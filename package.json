@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "node --test --experimental-strip-types tests/",
     "backfill:shelf-summaries": "node scripts/backfill-shelf-summaries.mjs",
     "backfill:shelf-summaries:dry": "DRY_RUN=1 node scripts/backfill-shelf-summaries.mjs"
   },
