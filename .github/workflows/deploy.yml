@@ -18,9 +18,10 @@ on:
   workflow_dispatch: # 手動実行も可
 
 # 連続マージで古いコミットのデプロイが最後に終わり、本番が古い版に戻るのを防ぐ（2026-11-19 に起きた）。
-# ① 同時に1本だけ走らせる。待ちは最新の1本だけ残り、古い待ちは取り消される（cancel-in-progress は使わない＝デプロイを途中で切らない）
-# ② 走り始めた時点で main の先頭でなければ、そのコミットはデプロイしない（後ろに新しい回が控えている）
-# ③ デプロイ後、本番の稼働リビジョンがこのコミットのイメージで、通信の100%を受けていることを確かめる
+# ① 同時に1本だけ走らせる（cancel-in-progress は使わない＝デプロイを途中で切らない）。待ちは1本だけ残る
+# ② 実行枠を取ってから main の先頭のコミットを調べ、**どの回でも main の先頭をデプロイする**（起動したコミットではない）。
+#    古い回の再実行が新しい回の待ちを取り消しても、その古い回が先頭をデプロイするので、本番は最新になる
+# ③ デプロイ後、本番の稼働リビジョンがそのコミットのイメージで、通信の100%を受けていることを確かめる
 concurrency:
   group: deploy-cloud-run-production
   cancel-in-progress: false
@@ -43,26 +44,27 @@ jobs:
       id-token: write  # Workload Identity Federation に必要
 
     steps:
-      # ① ソースコードを取得
+      # ①' 実行枠を取ったあとで main の先頭を調べる（取れなければ失敗にする。黙ってスキップしない）
+      - name: Resolve head of main
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::main の先頭を取れなかった（${SHA}）"; exit 1; fi
+          echo "trigger=${GITHUB_SHA} deploy=${SHA}"
+          if [ "$SHA" != "$GITHUB_SHA" ]; then echo "::notice::起動したコミット ${GITHUB_SHA} ではなく、main の先頭 ${SHA} をデプロイする"; fi
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
+      # ① ソースコードを取得（main の先頭）
       - name: Checkout
         uses: actions/checkout@v5
-
-      # ①b main の先頭かを確かめる（古いコミットを最後にデプロイしない）
-      - name: Skip if not the head of main
-        id: head
-        run: |
-          HEAD_SHA="$(git ls-remote origin refs/heads/main | cut -f1)"
-          echo "this=${GITHUB_SHA} main=${HEAD_SHA}"
-          if [ "${GITHUB_SHA}" = "${HEAD_SHA}" ]; then
-            echo "deploy=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "deploy=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::main の先頭ではないのでデプロイしない（新しいコミットの回が後で走る）"
-          fi
+        with:
+          ref: ${{ steps.head.outputs.sha }}
 
       # ② GCP へ認証（Workload Identity Federation）
       - name: Authenticate to Google Cloud
-        if: steps.head.outputs.deploy == 'true'
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
@@ -70,12 +72,10 @@ jobs:
 
       # ③ Docker 用に Artifact Registry へ認証
       - name: Configure Docker for Artifact Registry
-        if: steps.head.outputs.deploy == 'true'
         run: gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }} --quiet
 
       # ④ Docker イメージをビルド（NEXT_PUBLIC_* をビルド引数として注入）
       - name: Build Docker image
-        if: steps.head.outputs.deploy == 'true'
         run: |
           docker build \
             --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}" \
@@ -85,23 +85,21 @@ jobs:
             --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}" \
             --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}" \
             --build-arg NEXT_PUBLIC_ADMIN_EMAIL="${{ secrets.NEXT_PUBLIC_ADMIN_EMAIL }}" \
-            -t ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ github.sha }} \
+            -t ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }} \
             -t ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:latest \
             .
 
       # ⑤ Artifact Registry へ push
       - name: Push Docker image
-        if: steps.head.outputs.deploy == 'true'
         run: |
-          docker push ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ github.sha }}
+          docker push ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }}
           docker push ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:latest
 
       # ⑥ Cloud Run へデプロイ（上記 SA で明示的に実行。Secret は Secret Manager 参照）
       - name: Deploy to Cloud Run
-        if: steps.head.outputs.deploy == 'true'
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ github.sha }} \
+            --image ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }} \
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
@@ -128,7 +126,6 @@ jobs:
 
       # ⑦ デプロイ完了後に URL を表示
       - name: Show deployed URL
-        if: steps.head.outputs.deploy == 'true'
         run: |
           gcloud run services describe ${{ env.SERVICE_NAME }} \
             --region ${{ env.REGION }} \
@@ -136,13 +133,12 @@ jobs:
 
       # ⑧ 本番が今デプロイしたコミットで動いていることを確かめる（違えば失敗にする）
       - name: Verify serving revision
-        if: steps.head.outputs.deploy == 'true'
         run: |
-          WANT="${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ github.sha }}"
+          WANT="${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }}"
           READY="$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.latestReadyRevisionName)')"
           IMAGE="$(gcloud run revisions describe "$READY" --region ${{ env.REGION }} --format 'value(spec.containers[0].image)')"
           SERVING="$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'json(status.traffic)' | python3 -c 'import json,sys; t=json.load(sys.stdin)["status"]["traffic"]; print(",".join(x.get("revisionName","")+":"+str(x.get("percent",0)) for x in t if x.get("percent")))')"
           echo "ready=${READY} image=${IMAGE} serving=${SERVING}"
-          [ "$IMAGE" = "$WANT" ] || { echo "::error::稼働リビジョンのイメージが ${{ github.sha }} ではない"; exit 1; }
+          [ "$IMAGE" = "$WANT" ] || { echo "::error::稼働リビジョンのイメージが ${{ steps.head.outputs.sha }} ではない"; exit 1; }
           [ "$SERVING" = "${READY}:100" ] || { echo "::error::通信の100%が最新リビジョン ${READY} に向いていない（${SERVING}）"; exit 1; }
-          echo "### 本番の稼働：${READY}（${{ github.sha }}、100%）" >> "$GITHUB_STEP_SUMMARY"
+          echo "### 本番の稼働：${READY}（${{ steps.head.outputs.sha }}、100%）" >> "$GITHUB_STEP_SUMMARY"
