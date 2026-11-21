@@ -91,15 +91,21 @@ jobs:
 
       # ⑤ Artifact Registry へ push
       - name: Push Docker image
+        id: push
         run: |
+          set -euo pipefail
           docker push ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }}
           docker push ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:latest
+          # このコミットのイメージを digest で固定する（同じタグへの push し直しで中身がずれないように。2026-11-19 に起きた）
+          REF="$(docker inspect --format '{{index .RepoDigests 0}}' ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }})"
+          case "$REF" in ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}@sha256:*) ;; *) echo "::error::push したイメージの digest を取れなかった（${REF}）"; exit 1 ;; esac
+          echo "image=${REF}" >> "$GITHUB_OUTPUT"
 
       # ⑥ Cloud Run へデプロイ（上記 SA で明示的に実行。Secret は Secret Manager 参照）
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }} \
+            --image ${{ steps.push.outputs.image }} \
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
@@ -134,9 +140,12 @@ jobs:
       # ⑧ 本番が今デプロイしたコミットで動いていることを確かめる（違えば失敗にする）
       - name: Verify serving revision
         run: |
-          WANT="${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_REPO }}:${{ steps.head.outputs.sha }}"
+          # Cloud Run のリビジョンはイメージを digest の形で持つので、push した digest と比べる
+          WANT="${{ steps.push.outputs.image }}"
           READY="$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'value(status.latestReadyRevisionName)')"
+          DIGEST="$(gcloud run revisions describe "$READY" --region ${{ env.REGION }} --format 'value(status.imageDigest)')"
           IMAGE="$(gcloud run revisions describe "$READY" --region ${{ env.REGION }} --format 'value(spec.containers[0].image)')"
+          [ "${DIGEST:-$IMAGE}" = "$WANT" ] && IMAGE="$WANT"
           SERVING="$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --format 'json(status.traffic)' | python3 -c 'import json,sys; t=json.load(sys.stdin)["status"]["traffic"]; print(",".join(x.get("revisionName","")+":"+str(x.get("percent",0)) for x in t if x.get("percent")))')"
           echo "ready=${READY} image=${IMAGE} serving=${SERVING}"
           [ "$IMAGE" = "$WANT" ] || { echo "::error::稼働リビジョンのイメージが ${{ steps.head.outputs.sha }} ではない"; exit 1; }
