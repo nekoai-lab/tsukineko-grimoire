@@ -69,4 +69,4 @@ echo "⏳ Agent Builder のインデックス化は最大 48 時間かかりま�
 echo "   完了後に以下でステータスを更新してください:"
 echo ""
 echo "   curl -X POST ${BASE_URL}/api/admin/sync-status \\"
-echo "     -H \"Authorization: Bearer ${SECRET}\""
+echo "     -H \"Authorization: Bearer \$CRON_SECRET\"   # 値は表示しない。環境変数 CRON_SECRET を入れてから実行"
