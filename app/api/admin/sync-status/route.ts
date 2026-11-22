@@ -1,21 +1,10 @@
 import { SearchServiceClient } from '@google-cloud/discoveryengine';
 import { getAdminFirestore, FieldValue } from '@/lib/firebase-admin';
+import { isCronAuthorized } from '@/lib/cron-auth';
 
 // Cloud Scheduler または手動実行用 — Bearer トークン認証
 function isAuthorized(req: Request): boolean {
-  const auth = req.headers.get('authorization') ?? '';
-
-  // Cloud Scheduler OIDC トークン（デプロイ後）
-  if (auth.startsWith('Bearer ')) return true;
-
-  // 開発環境用: CRON_SECRET で保護
-  const secret = process.env.CRON_SECRET;
-  if (secret && auth === `Bearer ${secret}`) return true;
-
-  // Cloud Scheduler からの x-cloudscheduler-jobname ヘッダー
-  if (req.headers.get('x-cloudscheduler-jobname')) return true;
-
-  return false;
+  return isCronAuthorized(req);
 }
 
 function buildApiEndpoint(): string {
