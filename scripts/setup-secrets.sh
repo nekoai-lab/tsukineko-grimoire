@@ -54,7 +54,7 @@ create_or_update_secret "CRON_SECRET" "$CRON_SECRET"
 if [[ "${CRON_SECRET_GENERATED:-0}" == "1" ]]; then
   echo "CRON_SECRET を作って Secret Manager に入れました（値は表示しません）"
   echo "→ GitHub Secrets の CRON_SECRET にも同じ値が要ります。値を画面に出さずに写すには："
-  echo "   gcloud secrets versions access latest --secret=CRON_SECRET --project=\"$PROJECT_ID\" | gh secret set CRON_SECRET"
+  echo "   gcloud secrets versions access latest --secret=CRON_SECRET --project=\"$PROJECT_ID\" | gh secret set CRON_SECRET --repo nekoai-lab/tsukineko-grimoire"
 fi
 
 echo ""
