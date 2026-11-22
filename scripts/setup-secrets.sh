@@ -46,11 +46,16 @@ create_or_update_secret "FIREBASE_CLIENT_EMAIL" "$FIREBASE_CLIENT_EMAIL"
 if [[ -z "${CRON_SECRET:-}" ]] || [[ "$CRON_SECRET" == "local-dev-secret" ]]; then
   echo "⚠️  CRON_SECRET が未設定またはデフォルト値です"
   echo "本番用シークレットを生成します..."
+  # 値は画面に出さない（ターミナルの履歴・ログに残るため）
   CRON_SECRET=$(openssl rand -hex 32)
-  echo "生成された CRON_SECRET: $CRON_SECRET"
-  echo "→ GitHub Secrets の CRON_SECRET にも同じ値を登録してください（GitHub Actions からの呼び出し用）"
+  CRON_SECRET_GENERATED=1
 fi
 create_or_update_secret "CRON_SECRET" "$CRON_SECRET"
+if [[ "${CRON_SECRET_GENERATED:-0}" == "1" ]]; then
+  echo "CRON_SECRET を作って Secret Manager に入れました（値は表示しません）"
+  echo "→ GitHub Secrets の CRON_SECRET にも同じ値が要ります。値を画面に出さずに写すには："
+  echo "   gcloud secrets versions access latest --secret=CRON_SECRET --project=\"$PROJECT_ID\" | gh secret set CRON_SECRET --repo nekoai-lab/tsukineko-grimoire"
+fi
 
 echo ""
 echo "✅ Secret Manager へのシークレット登録が完了しました"
