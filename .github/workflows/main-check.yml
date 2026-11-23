@@ -1,0 +1,138 @@
+name: main-check
+
+# main への push が PR 経由かを確かめ、そうでなければ Issue を立てる（止めずに気づく）
+# push の範囲（before..after）のコミットを全部見て、PR のマージで入った分を除いた残りを調べる
+# このワークフロー自身を消す push では動かない（消した後の版で起動するため）。それは bin/preflight が origin/main を見て気づく
+# PR を通さない push でも、変わったファイルが全部 .github/direct-push-allow の glob に一致すれば OK
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 初回コミットは対象外
+        id: first
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "main の作成（初回コミット）なので対象外"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.first.outputs.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: PR 経由か、direct-push-allow に一致するか確かめる
+        if: steps.first.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BEFORE: ${{ github.event.before }}
+          ACTOR: ${{ github.actor }}
+          COMPARE: ${{ github.event.compare }}
+          BASE: ${{ github.ref_name }}
+        run: |
+          # PR のマージで入ったコミットか。この SHA を作った、main（BASE）向けのマージ済み PR だけを数える。別ブランチ向けにマージ済みの
+          # PR のコミットが main に直接 push されたときに「PR 経由」と誤認しないため（2026-11-18、family-study-assistant #2 の QA）
+          is_pr_merge() {  # is_pr_merge <sha> <試す回数>
+            local c=0 i
+            for ((i = 1; i <= $2; i++)); do
+              # API が一時的に空の応答を返すと gh が "unexpected end of JSON input" で落ちる（2026-11-17 実例）。0 件扱いで次を試す
+              c=$(gh api "repos/$REPO/commits/$1/pulls" --jq "[.[] | select(.merged_at != null and .base.ref == \"$BASE\" and .merge_commit_sha == \"$1\")] | length" 2>/dev/null) || c=0
+              [ -n "$c" ] || c=0
+              [ "$c" -gt 0 ] && return 0
+              [ "$i" -lt "$2" ] && sleep 10
+            done
+            return 1
+          }
+
+          reason=""
+          if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            reason="push の前のコミットが見つからない（force push の可能性）"
+            notice="$reason"
+          elif ! git merge-base --is-ancestor "$BEFORE" "$SHA"; then
+            # push の前のコミットが push の後の祖先にない（巻き戻し・書き換え）。before..after が空になっても OK にしない
+            # （2026-11-23、ai-dev-harness#90 の QA）
+            reason="push の前のコミットが push の後の祖先にない（force push・巻き戻しの可能性）"
+            notice="$reason"
+          else
+            # push で main に入ったコミットを、main の1本目の親の筋（first-parent）でたどり、PR のマージで入った分を除く。
+            # 末尾だけで判定すると、同じ push の途中の直接のコミットを見逃す（2026-11-23、okane-kenko#115 の QA）。
+            # PR のマージなら、そのコミットと、それで新しく入ったブランチ側のコミット（<sha>^1..<sha>）を除く。
+            # マージ直後は API に反映されるまで少しかかることがあるので、末尾は3回まで試す（途中は前の push で反映済み）
+            # 連想配列は使わない（手元の試験を macOS の bash 3.2 でも回すため）。改行区切りの一覧で持つ
+            via_pr=$'\n'
+            while IFS= read -r c; do
+              tries=1; [ "$c" = "$SHA" ] && tries=3
+              if is_pr_merge "$c" "$tries"; then
+                via_pr+="$(git rev-list "$c^1..$c")"$'\n'
+              fi
+            done < <(git rev-list --first-parent "$BEFORE..$SHA")
+            direct=()
+            while IFS= read -r c; do
+              case "$via_pr" in *$'\n'"$c"$'\n'*) ;; *) direct+=("$c") ;; esac
+            done < <(git rev-list "$BEFORE..$SHA")
+            if [ ${#direct[@]} -eq 0 ]; then
+              echo "PR 経由: OK"
+              exit 0
+            fi
+
+            # PR を通していないコミットがある。それらで変わったファイルが全部 direct-push-allow に一致するか
+            # 許可リストは push の前の版を読む（同じ push で許可を広げても効かない）
+            patterns=()
+            while IFS= read -r line || [ -n "$line" ]; do
+              line="${line%%#*}"
+              line="$(printf '%s' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+              [ -n "$line" ] && patterns+=("$line")
+            done < <(git show "$BEFORE:.github/direct-push-allow" 2>/dev/null || true)
+
+            outside=()
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              ok=0
+              for p in "${patterns[@]}"; do
+                # shellcheck disable=SC2053  # glob として照合する（* は / もまたぐ）
+                if [[ "$f" == $p ]]; then ok=1; break; fi
+              done
+              [ $ok = 1 ] || outside+=("$f")
+            # PR を通していないコミットごとに変わったパスを見る（同じ push で足して消したファイルも数える。
+            # マージコミットは1つ目の親との差分）。2026-11-18、family-study-assistant #2 の QA
+            done < <(for c in "${direct[@]}"; do git log -1 --format= --name-only --no-renames --diff-merges=first-parent "$c"; done | sort -u)
+
+            if [ ${#outside[@]} -eq 0 ]; then
+              echo "PR を通していないコミットはあるが、変わったファイルが全部 direct-push-allow に一致: OK"
+              exit 0
+            fi
+            reason="PR を通していないコミット ${#direct[@]} 件。direct-push-allow に一致しないファイル（${#outside[@]} 件）: $(printf '%s ' "${outside[@]:0:20}")"
+            # 外部（ntfy）に送るのは件数だけ。ファイル名に個人名などが入りうるので、パスは Issue（リポジトリの中）にだけ書く
+            notice="direct-push-allow に一致しないファイルが ${#outside[@]} 件"
+          fi
+
+          echo "PR を通さずに main に入った: $SHA"
+          echo "$reason"
+          short=${SHA:0:7}
+          gh label create direct-push --repo "$REPO" --color D93F0B \
+            --description "PR を通さずに main に入った変更" --force
+          issue_url=$(gh issue create --repo "$REPO" --label direct-push \
+            --title "PR を通さずに main に入った変更: $short" \
+            --body "$(printf 'main に PR を通さないコミットが入りました。\n\n- コミット: %s\n- push した人: %s\n- 差分: %s\n- 理由: %s\n\n中身を確かめて、問題なければこの Issue を閉じてください。問題があれば revert の PR を作ってください。\nmain に直接でよいパスなら、.github/direct-push-allow に glob を足す PR を作ってください。\n\n（main-check.yml が自動で立てた Issue）' "$SHA" "$ACTOR" "$COMPARE" "$reason")")
+
+          # 外部（ntfy）には push した人のログイン名も送らない。誰が push したかは Issue（リポジトリの中）にだけ書く（2026-11-23、grimoire#31 の QA）
+          if [ -n "$NTFY_TOPIC" ]; then
+            jq -n --arg topic "$NTFY_TOPIC" --arg title "main への直接 push: $REPO" --arg msg "PR を通さないコミット ${short}。${notice}。Issue を開いて中身を確かめてください" --arg url "$issue_url" \
+              '{topic: $topic, title: $title, message: $msg, priority: 4, tags: ["warning"], click: $url}' \
+              | curl -fsS --max-time 10 -o /dev/null -H 'Content-Type: application/json' --data-binary @- https://ntfy.sh/ || true
+          fi
